@@ -37010,29 +37010,93 @@ function parseResult(stdout) {
     }
     return value;
 }
-function setOptionalOutput(name, value) {
-    if (value !== undefined && value !== null && value !== "") {
-        setOutput(name, String(value));
+function requiredString(result, name, context) {
+    const value = result[name];
+    if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(`ship-my-flutter returned an invalid ${context} result: ` +
+            `"${name}" must be a non-empty string.`);
     }
+    return value;
 }
-function mapOutputs(selected, result) {
-    if (selected === "plan") {
-        setOutput("phase", String(result.phase ?? "noop"));
-        setOptionalOutput("platform", result.platform);
-        setOptionalOutput("version", result.version);
-        setOptionalOutput("branch", result.branch);
-        setOptionalOutput("pull-request-number", result.pullRequestNumber);
+function optionalPositiveInteger(result, name, context) {
+    const value = result[name];
+    if (value === undefined)
+        return undefined;
+    if (!Number.isSafeInteger(value) || value <= 0) {
+        throw new Error(`ship-my-flutter returned an invalid ${context} result: ` +
+            `"${name}" must be a positive integer.`);
+    }
+    return value;
+}
+function iosPlatform(result, context) {
+    if (result.platform !== "ios") {
+        throw new Error(`ship-my-flutter returned an invalid ${context} result: ` +
+            '"platform" must be "ios".');
+    }
+    return "ios";
+}
+function plannedPhase(result) {
+    const value = result.phase;
+    if (value === "noop" || value === "candidate" || value === "promote") {
+        return value;
+    }
+    throw new Error('ship-my-flutter returned an invalid plan result: "phase" must be ' +
+        '"noop", "candidate", or "promote".');
+}
+function mapPlanOutputs(result) {
+    const nextPhase = plannedPhase(result);
+    if (nextPhase === "noop") {
+        setOutput("phase", nextPhase);
         return;
     }
-    setOutput("phase", selected);
-    setOutput("platform", String(result.platform ?? "ios"));
-    setOptionalOutput("version", result.version);
-    setOptionalOutput("build-id", result.buildId);
-    if (selected === "candidate") {
-        setOptionalOutput("build-number", result.buildNumber);
+    const platform = iosPlatform(result, "plan");
+    const version = requiredString(result, "version", "plan");
+    let branch;
+    let pullRequestNumber;
+    if (nextPhase === "candidate") {
+        branch = requiredString(result, "branch", "plan");
+        pullRequestNumber = optionalPositiveInteger(result, "pullRequestNumber", "plan");
     }
-    else {
-        setOptionalOutput("release-url", result.githubReleaseUrl);
+    setOutput("phase", nextPhase);
+    setOutput("platform", platform);
+    setOutput("version", version);
+    if (branch !== undefined)
+        setOutput("branch", branch);
+    if (pullRequestNumber !== undefined) {
+        setOutput("pull-request-number", String(pullRequestNumber));
+    }
+}
+function mapCandidateOutputs(result) {
+    const platform = iosPlatform(result, "candidate");
+    const version = requiredString(result, "version", "candidate");
+    const buildId = requiredString(result, "buildId", "candidate");
+    const buildNumber = requiredString(result, "buildNumber", "candidate");
+    setOutput("phase", "candidate");
+    setOutput("platform", platform);
+    setOutput("version", version);
+    setOutput("build-id", buildId);
+    setOutput("build-number", buildNumber);
+}
+function mapPromoteOutputs(result) {
+    const version = requiredString(result, "version", "promote");
+    const buildId = requiredString(result, "buildId", "promote");
+    const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "promote");
+    setOutput("phase", "promote");
+    setOutput("platform", "ios");
+    setOutput("version", version);
+    setOutput("build-id", buildId);
+    setOutput("release-url", githubReleaseUrl);
+}
+function mapOutputs(selected, result) {
+    switch (selected) {
+        case "plan":
+            mapPlanOutputs(result);
+            return;
+        case "candidate":
+            mapCandidateOutputs(result);
+            return;
+        case "promote":
+            mapPromoteOutputs(result);
     }
 }
 async function run() {

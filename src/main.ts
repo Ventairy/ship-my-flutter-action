@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 type Phase = "plan" | "candidate" | "promote";
 type JsonObject = Record<string, unknown>;
+type PlannedPhase = "noop" | "candidate" | "promote";
 
 const sensitiveEnvironmentNames = [
   "INPUT_GITHUB_TOKEN",
@@ -75,29 +76,126 @@ function parseResult(stdout: string): JsonObject {
   return value as JsonObject;
 }
 
-function setOptionalOutput(name: string, value: unknown): void {
-  if (value !== undefined && value !== null && value !== "") {
-    core.setOutput(name, String(value));
+function requiredString(
+  result: JsonObject,
+  name: string,
+  context: string,
+): string {
+  const value = result[name];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(
+      `ship-my-flutter returned an invalid ${context} result: ` +
+        `"${name}" must be a non-empty string.`,
+    );
+  }
+  return value;
+}
+
+function optionalPositiveInteger(
+  result: JsonObject,
+  name: string,
+  context: string,
+): number | undefined {
+  const value = result[name];
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+    throw new Error(
+      `ship-my-flutter returned an invalid ${context} result: ` +
+        `"${name}" must be a positive integer.`,
+    );
+  }
+  return value as number;
+}
+
+function iosPlatform(result: JsonObject, context: string): "ios" {
+  if (result.platform !== "ios") {
+    throw new Error(
+      `ship-my-flutter returned an invalid ${context} result: ` +
+        '"platform" must be "ios".',
+    );
+  }
+  return "ios";
+}
+
+function plannedPhase(result: JsonObject): PlannedPhase {
+  const value = result.phase;
+  if (value === "noop" || value === "candidate" || value === "promote") {
+    return value;
+  }
+  throw new Error(
+    'ship-my-flutter returned an invalid plan result: "phase" must be ' +
+      '"noop", "candidate", or "promote".',
+  );
+}
+
+function mapPlanOutputs(result: JsonObject): void {
+  const nextPhase = plannedPhase(result);
+  if (nextPhase === "noop") {
+    core.setOutput("phase", nextPhase);
+    return;
+  }
+
+  const platform = iosPlatform(result, "plan");
+  const version = requiredString(result, "version", "plan");
+  let branch: string | undefined;
+  let pullRequestNumber: number | undefined;
+  if (nextPhase === "candidate") {
+    branch = requiredString(result, "branch", "plan");
+    pullRequestNumber = optionalPositiveInteger(
+      result,
+      "pullRequestNumber",
+      "plan",
+    );
+  }
+
+  core.setOutput("phase", nextPhase);
+  core.setOutput("platform", platform);
+  core.setOutput("version", version);
+  if (branch !== undefined) core.setOutput("branch", branch);
+  if (pullRequestNumber !== undefined) {
+    core.setOutput("pull-request-number", String(pullRequestNumber));
   }
 }
 
+function mapCandidateOutputs(result: JsonObject): void {
+  const platform = iosPlatform(result, "candidate");
+  const version = requiredString(result, "version", "candidate");
+  const buildId = requiredString(result, "buildId", "candidate");
+  const buildNumber = requiredString(result, "buildNumber", "candidate");
+
+  core.setOutput("phase", "candidate");
+  core.setOutput("platform", platform);
+  core.setOutput("version", version);
+  core.setOutput("build-id", buildId);
+  core.setOutput("build-number", buildNumber);
+}
+
+function mapPromoteOutputs(result: JsonObject): void {
+  const version = requiredString(result, "version", "promote");
+  const buildId = requiredString(result, "buildId", "promote");
+  const githubReleaseUrl = requiredString(
+    result,
+    "githubReleaseUrl",
+    "promote",
+  );
+
+  core.setOutput("phase", "promote");
+  core.setOutput("platform", "ios");
+  core.setOutput("version", version);
+  core.setOutput("build-id", buildId);
+  core.setOutput("release-url", githubReleaseUrl);
+}
+
 function mapOutputs(selected: Phase, result: JsonObject): void {
-  if (selected === "plan") {
-    core.setOutput("phase", String(result.phase ?? "noop"));
-    setOptionalOutput("platform", result.platform);
-    setOptionalOutput("version", result.version);
-    setOptionalOutput("branch", result.branch);
-    setOptionalOutput("pull-request-number", result.pullRequestNumber);
-    return;
-  }
-  core.setOutput("phase", selected);
-  core.setOutput("platform", String(result.platform ?? "ios"));
-  setOptionalOutput("version", result.version);
-  setOptionalOutput("build-id", result.buildId);
-  if (selected === "candidate") {
-    setOptionalOutput("build-number", result.buildNumber);
-  } else {
-    setOptionalOutput("release-url", result.githubReleaseUrl);
+  switch (selected) {
+    case "plan":
+      mapPlanOutputs(result);
+      return;
+    case "candidate":
+      mapCandidateOutputs(result);
+      return;
+    case "promote":
+      mapPromoteOutputs(result);
   }
 }
 

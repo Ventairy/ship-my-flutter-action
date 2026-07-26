@@ -92,6 +92,88 @@ describe("action adapter", () => {
     );
   });
 
+  it("rejects a plan result without an explicit supported phase", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({ platform: "ios" }),
+    });
+
+    await expect(run()).rejects.toThrow('invalid plan result: "phase" must be');
+    expect(setOutput).not.toHaveBeenCalled();
+  });
+
+  it("rejects an incomplete candidate plan", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "candidate",
+        platform: "ios",
+        version: "1.2.0",
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      'invalid plan result: "branch" must be a non-empty string',
+    );
+  });
+
+  it("rejects a malformed pull request number", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "candidate",
+        platform: "ios",
+        version: "1.2.0",
+        branch: "ship-my-flutter/ios",
+        pullRequestNumber: "12",
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      'invalid plan result: "pullRequestNumber" must be a positive integer',
+    );
+  });
+
+  it("rejects an incomplete direct candidate result", async () => {
+    process.env.INPUT_PHASE = "candidate";
+    if (process.platform !== "darwin") return;
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        platform: "ios",
+        version: "1.2.0",
+        buildNumber: "7",
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      'invalid candidate result: "buildId" must be a non-empty string',
+    );
+  });
+
+  it("rejects an incomplete promotion result", async () => {
+    process.env.INPUT_PHASE = "promote";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        version: "2.0.0",
+        buildId: "build-42",
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      'invalid promote result: "githubReleaseUrl" must be a non-empty string',
+    );
+  });
+
   it("surfaces a failed Dart command without parsing output", async () => {
     process.env.INPUT_PHASE = "plan";
     getExecOutput.mockResolvedValue({

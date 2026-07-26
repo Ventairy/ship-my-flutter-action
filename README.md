@@ -63,6 +63,9 @@ complete multi-job workflow. Its essential action steps are:
 
 > [!IMPORTANT]
 > The candidate phase requires macOS and the supported Xcode/Flutter toolchain.
+> Use an App Store Connect API key with `Developer` access only for upload-only
+> delivery without TestFlight groups. Group assignment and App Review
+> submission require at least `App Manager` access.
 > The generated workflow uses GitHub-hosted `macos-26`; a compatible ephemeral
 > self-hosted runner is also valid. Plan and promote can run on Ubuntu.
 
