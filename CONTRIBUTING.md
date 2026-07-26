@@ -1,6 +1,6 @@
 # Contributing
 
-Install Node.js, pnpm 11, and Dart 3.10 or newer, then run:
+Install Node.js, pnpm 10, and Dart 3.10 or newer, then run:
 
 ```bash
 pnpm install --frozen-lockfile

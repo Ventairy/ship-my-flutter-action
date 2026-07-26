@@ -10,8 +10,8 @@ All notable changes to ship-my-flutter-action are documented here.
 - Pinned Dart and Flutter setup dependencies, vendored Dart core/lockfile, and
   a thin native TypeScript adapter.
 - Hosted byte-for-byte verification of vendored core provenance.
-- Pinned pnpm development workflow with frozen installs, package-signature
-  auditing, dependency-age safeguards, and enforced coverage thresholds.
+- Pinned pnpm development workflow with frozen installs, registry trust and
+  dependency-age safeguards, and enforced coverage thresholds.
 - Pull-request dependency review for newly introduced high-severity
   vulnerabilities.
 

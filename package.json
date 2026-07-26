@@ -4,14 +4,13 @@
   "description": "The official GitHub Action for ship-my-flutter.",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@11.17.0",
+  "packageManager": "pnpm@10.34.5+sha512.a4ee05f2f73658255bd6a89859c065a45c28a57daefae2c893a168ee2b73168c37b91e83e57ea67654ad03f03031746430e8bce38e362e042605fb8abc80192e",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "audit": "pnpm audit --audit-level high",
     "audit:prod": "pnpm audit --prod --audit-level high",
-    "audit:signatures": "pnpm audit signatures",
     "build": "node scripts/clean-dist.mjs && ncc build src/main.ts -o dist --license licenses.txt",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test:coverage && pnpm run build",
     "format": "prettier --write .",

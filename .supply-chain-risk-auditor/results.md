@@ -6,8 +6,8 @@
 
 - **Scan Date**: 2026-07-26 17:35:00 -03:00
 - **Project**: ship-my-flutter-action
-- **Repositories Scanned**: 15 repositories
-- **Total Dependencies**: 17 direct packages, package-manager, and GitHub Action dependencies
+- **Repositories Scanned**: 14 repositories
+- **Total Dependencies**: 16 direct packages, package-manager, and GitHub Action dependencies
 - **Scan Duration**: 12 minutes
 
 ---
@@ -17,9 +17,9 @@
 All audited repositories were active and unarchived. No direct dependency met
 the report threshold of two or more risk factors. The two dependencies noted
 below have security-sensitive responsibilities, but both are maintained and
-widely used. Every GitHub Action reference is pinned to a full commit SHA,
-pnpm lifecycle scripts are denied by default, all 186 installed npm packages
-have verified registry signatures, and the npm advisory audit found no known
+widely used. Every GitHub Action reference is pinned to a full commit SHA.
+pnpm lifecycle scripts are denied by default, store integrity and publisher
+trust downgrades are checked, and the npm advisory audit found no known
 vulnerabilities.
 
 ### Counts by Risk Factor
