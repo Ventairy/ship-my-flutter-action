@@ -11,6 +11,8 @@ npm run check
 Use Conventional Commits and keep source, tests, the vendored core, its
 Action-owned deployment lockfile and `CORE_COMMIT` provenance record, and the
 checked-in `dist` bundle synchronized.
+CI resolves `CORE_COMMIT` from the public core repository and compares the
+vendored source byte-for-byte.
 
 To refresh the core from the clean sibling checkout, run `vendor-core` with
 Dart 3.10. It copies the core and generates the Action's committed lockfile:

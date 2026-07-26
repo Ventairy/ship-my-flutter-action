@@ -29,3 +29,31 @@ jobs:
       - run: dart pub get --enforce-lockfile -C vendor/ship-my-flutter
       - run: npm run check
       - run: git diff --exit-code -- dist
+      - id: core
+        if: matrix.node == 20
+        name: Read vendored core provenance
+        shell: bash
+        run: |
+          core_commit="$(tr -d '\r\n' < vendor/ship-my-flutter/CORE_COMMIT)"
+          if [[ ! "$core_commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "CORE_COMMIT must contain one full lowercase Git SHA." >&2
+            exit 1
+          fi
+          printf 'commit=%s\n' "$core_commit" >> "$GITHUB_OUTPUT"
+      - if: matrix.node == 20
+        name: Check out recorded core
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: Ventairy/ship-my-flutter
+          ref: ${{ steps.core.outputs.commit }}
+          path: upstream-core
+          persist-credentials: false
+      - if: matrix.node == 20
+        name: Verify vendored core provenance
+        shell: bash
+        run: |
+          diff -ru upstream-core/bin vendor/ship-my-flutter/bin
+          diff -ru upstream-core/lib vendor/ship-my-flutter/lib
+          cmp upstream-core/pubspec.yaml vendor/ship-my-flutter/pubspec.yaml
+          cmp upstream-core/LICENSE vendor/ship-my-flutter/LICENSE
+          cmp upstream-core/NOTICE vendor/ship-my-flutter/NOTICE

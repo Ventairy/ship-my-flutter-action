@@ -140,6 +140,10 @@ The repository checks in two generated artifacts:
   lockfile, and `CORE_COMMIT` provenance record;
 - `dist`: bundled thin TypeScript Action adapter.
 
+Hosted CI checks out the recorded public core commit and compares every
+vendored source/package file byte-for-byte. The Action-owned
+`pubspec.lock` is verified separately with `--enforce-lockfile`.
+
 After a core change, start from a clean adjacent core checkout. Run
 `vendor-core` with Dart 3.10 so it copies the source, records its commit, and
 generates the Action's deployment lockfile:
