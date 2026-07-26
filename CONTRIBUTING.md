@@ -9,9 +9,11 @@ npm run check
 ```
 
 Use Conventional Commits and keep source, tests, the vendored core, its
-`CORE_COMMIT` provenance record, and the checked-in `dist` bundle synchronized.
+Action-owned deployment lockfile and `CORE_COMMIT` provenance record, and the
+checked-in `dist` bundle synchronized.
 
-To refresh the core from the sibling checkout:
+To refresh the core from the clean sibling checkout, run `vendor-core` with
+Dart 3.10. It copies the core and generates the Action's committed lockfile:
 
 ```bash
 npm run vendor-core

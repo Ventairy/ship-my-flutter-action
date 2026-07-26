@@ -18,9 +18,10 @@ It exposes the full release lifecycle through one action:
 - `promote` verifies that recorded build after merge, optionally submits it
   when configured, and completes the platform GitHub Release.
 
-The Action vendors the exact Dart core source and lockfile. It installs its own
-pinned Dart SDK and resolves that lockfile automatically, so consumer
-repositories do not install Node packages or Fastlane.
+The Action vendors the exact Dart core source and owns a generated deployment
+lockfile for it. It installs its own pinned Dart SDK and enforces that lockfile
+automatically, so consumer repositories do not install Node packages or
+Fastlane.
 
 ## Use
 
@@ -132,11 +133,13 @@ The Action is deliberately hybrid:
 
 The repository checks in two generated artifacts:
 
-- `vendor/ship-my-flutter`: exact Dart package source, lockfile, and
-  `CORE_COMMIT` provenance record;
+- `vendor/ship-my-flutter`: exact Dart package source, Action-owned deployment
+  lockfile, and `CORE_COMMIT` provenance record;
 - `dist`: bundled thin TypeScript Action adapter.
 
-After a core change, start from a clean adjacent core checkout:
+After a core change, start from a clean adjacent core checkout. Run
+`vendor-core` with Dart 3.10 so it copies the source, records its commit, and
+generates the Action's deployment lockfile:
 
 ```bash
 npm run vendor-core

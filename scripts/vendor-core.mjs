@@ -37,13 +37,11 @@ await Promise.all([
     path.join(destination, "pubspec.yaml"),
   ),
   fs.copyFile(
-    path.join(coreRoot, "pubspec.lock"),
-    path.join(destination, "pubspec.lock"),
-  ),
-  fs.copyFile(
     path.join(coreRoot, "LICENSE"),
     path.join(destination, "LICENSE"),
   ),
   fs.copyFile(path.join(coreRoot, "NOTICE"), path.join(destination, "NOTICE")),
   fs.writeFile(path.join(destination, "CORE_COMMIT"), coreCommit.trim() + "\n"),
 ]);
+
+await execFileAsync("dart", ["pub", "get"], { cwd: destination });
