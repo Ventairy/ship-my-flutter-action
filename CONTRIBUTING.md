@@ -8,13 +8,14 @@ dart pub get --enforce-lockfile -C vendor/ship-my-flutter
 npm run check
 ```
 
-Use Conventional Commits and keep source, tests, the vendored core, and the checked-in `dist` bundle synchronized.
+Use Conventional Commits and keep source, tests, the vendored core, its
+`CORE_COMMIT` provenance record, and the checked-in `dist` bundle synchronized.
 
 To refresh the core from the sibling checkout:
 
 ```bash
 npm run vendor-core
-npm install
+npm ci
 dart pub get --enforce-lockfile -C vendor/ship-my-flutter
 npm run check
 ```

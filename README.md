@@ -9,13 +9,14 @@ The official GitHub Action for [ship-my-flutter](https://github.com/Ventairy/shi
 > [action issue #1](https://github.com/Ventairy/ship-my-flutter-action/issues/1)
 > after the live Apple acceptance gate. Examples below describe the intended
 > stable interface. Non-Apple action behavior is exercised publicly in
-> [`Ventairy/ship-my-flutter-e2e`](https://github.com/Ventairy/ship-my-flutter-e2e).
+> [`Ventairy/ship-my-flutter-dart-e2e`](https://github.com/Ventairy/ship-my-flutter-dart-e2e).
 
 It exposes the full release lifecycle through one action:
 
 - `plan` opens or updates the platform release PR;
 - `candidate` builds, signs, uploads, and records the exact TestFlight build;
-- `promote` submits that recorded build after the release PR merges.
+- `promote` verifies that recorded build after merge, optionally submits it
+  when configured, and completes the platform GitHub Release.
 
 The Action vendors the exact Dart core source and lockfile. It installs its own
 pinned Dart SDK and resolves that lockfile automatically, so consumer
@@ -60,7 +61,9 @@ complete multi-job workflow. Its essential action steps are:
 ```
 
 > [!IMPORTANT]
-> The candidate phase must run on `macos-26`. Plan and promote can run on Ubuntu.
+> The candidate phase requires macOS and the supported Xcode/Flutter toolchain.
+> The generated workflow uses GitHub-hosted `macos-26`; a compatible ephemeral
+> self-hosted runner is also valid. Plan and promote can run on Ubuntu.
 
 ## Inputs
 
@@ -78,21 +81,29 @@ complete multi-job workflow. Its essential action steps are:
 | `ios-certificate-password`             | candidate         | yes           | `.p12` password                                     |
 | `ios-provisioning-profiles-base64`     | candidate         | yes           | Base64 profile or bundle-ID JSON map                |
 
-Set only one of `flutter-version` and `flutter-version-file`. When neither is set, the action uses `.fvmrc`, `.fvm/fvm_config.json`, or `fvm_config.json` when present, in that order; otherwise it installs the selected channel’s current version.
+Set only one of `flutter-version` and `flutter-version-file`. When neither is
+set, the action looks for `.fvmrc`, `.fvm/fvm_config.json`, or
+`fvm_config.json` at the Git repository root, in that order; otherwise it
+installs the selected channel's current version. In a monorepo with app-local
+FVM configuration, pass its repository-relative path explicitly.
 
 ## Outputs
 
-The action emits the fields relevant to its phase:
+The action emits fields relevant to the selected phase:
 
-`phase`, `platform`, `version`, `branch`, `pull-request-number`, `build-id`, `build-number`, and `release-url`.
+| Selected phase | Outputs                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `plan`         | `phase` (`noop`, `candidate`, or `promote`), plus `platform`, `version`, `branch`, and `pull-request-number` when relevant |
+| `candidate`    | `phase=candidate`, `platform`, `version`, `build-id`, and `build-number`                                                   |
+| `promote`      | `phase=promote`, `platform`, `version`, `build-id`, and `release-url`                                                      |
 
 The generated workflow uses `phase` and `branch` to dispatch the macOS candidate job without depending on token-generated pushes to start another workflow.
 
-When `plan` uses the default `GITHUB_TOKEN`, GitHub creates runs for the release
-PR's other `pull_request` workflows in an approval-required state. A maintainer
-with write access selects **Approve workflows to run** in the PR. If those runs
-must start automatically, pass a GitHub App installation token (preferred) or a
-narrowly scoped personal access token through `github-token`.
+When `plan` uses the default `GITHUB_TOKEN`, GitHub does not create new workflow
+runs for the resulting PR event. This Action's candidate still runs because the
+generated workflow dispatches it from the plan output. If the repository's
+other `pull_request` workflows must run, pass a GitHub App installation token
+(preferred) or a narrowly scoped personal access token through `github-token`.
 
 The repository or organization must also allow GitHub Actions to create pull
 requests. Enable **Settings → Actions → General → Workflow permissions → Allow
@@ -121,14 +132,15 @@ The Action is deliberately hybrid:
 
 The repository checks in two generated artifacts:
 
-- `vendor/ship-my-flutter`: exact Dart package source and lockfile;
+- `vendor/ship-my-flutter`: exact Dart package source, lockfile, and
+  `CORE_COMMIT` provenance record;
 - `dist`: bundled thin TypeScript Action adapter.
 
-After a core change:
+After a core change, start from a clean adjacent core checkout:
 
 ```bash
 npm run vendor-core
-npm install
+npm ci
 npm run format
 dart pub get --enforce-lockfile -C vendor/ship-my-flutter
 npm run check

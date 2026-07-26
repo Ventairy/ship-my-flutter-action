@@ -47,7 +47,7 @@ inputs:
 
 outputs:
   phase:
-    description: "Next phase: noop, candidate, or promote."
+    description: For plan, the selected next phase; for candidate/promote, the completed phase.
     value: ${{ steps.run.outputs.phase }}
   platform:
     description: Platform being released.
