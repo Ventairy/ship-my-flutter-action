@@ -29,7 +29,9 @@ npx ship-my-flutter init \
   --bundle-id com.example.myapp
 ```
 
-It writes the complete multi-job workflow. The essential action steps are:
+The generated `.ship-my-flutter/config.yaml` includes a JSON Schema directive
+for editor validation and autocomplete. The initializer also writes the
+complete multi-job workflow. Its essential action steps are:
 
 ```yaml
 - uses: Ventairy/ship-my-flutter-action@v1

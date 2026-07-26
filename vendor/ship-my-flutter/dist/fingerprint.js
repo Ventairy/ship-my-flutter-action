@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import YAML from "yaml";
 import { git } from "./git.js";
 const excluded = new Set([
     ".ship-my-flutter/changelog.json",
-    ".ship-my-flutter/config.json",
+    ".ship-my-flutter/config.yaml",
     ".ship-my-flutter/store-release-notes.json",
 ]);
 function shouldInclude(file) {
@@ -30,9 +31,9 @@ export async function sourceFingerprint(root) {
             : await fs.readFile(filePath));
         hash.update("\0");
     }
-    const configPath = path.join(root, ".ship-my-flutter", "config.json");
+    const configPath = path.join(root, ".ship-my-flutter", "config.yaml");
     try {
-        const config = JSON.parse(await fs.readFile(configPath, "utf8"));
+        const config = YAML.parse(await fs.readFile(configPath, "utf8"));
         const ios = config.platforms?.ios;
         hash.update(".ship-my-flutter/config.build-inputs\0");
         hash.update(JSON.stringify({

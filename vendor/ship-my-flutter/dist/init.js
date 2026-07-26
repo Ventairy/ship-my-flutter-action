@@ -4,9 +4,10 @@ import semver from "semver";
 import YAML from "yaml";
 import { invariant, ShipError } from "./errors.js";
 import { currentSha } from "./git.js";
-import { fileExists, writeJson } from "./json.js";
+import { fileExists, writeJson, writeYaml } from "./json.js";
 import { emptyChangelog } from "./manifest-files.js";
 import { resolveShipPaths } from "./paths.js";
+const configSchemaUrl = "https://raw.githubusercontent.com/Ventairy/ship-my-flutter/main/schemas/config.schema.json";
 async function detectFlutterVersion(root) {
     const pubspecPath = path.join(root, "pubspec.yaml");
     if (!(await fileExists(pubspecPath)))
@@ -63,7 +64,7 @@ export async function initialize(options) {
     const workflowTemplate = new URL("../templates/ship-my-flutter.yml", import.meta.url);
     await fs.mkdir(paths.candidates, { recursive: true });
     const writes = [
-        writeJson(paths.config, config),
+        writeYaml(paths.config, config, configSchemaUrl),
         writeJson(paths.manifest, manifest),
         writeJson(paths.changelog, emptyChangelog()),
         writeJson(paths.storeReleaseNotes, notes),

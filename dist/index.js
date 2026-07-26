@@ -48300,7 +48300,6 @@ exports.prettifyError = prettifyError;
 /***/ 8815:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
-var __webpack_unused_export__;
 
 
 var composer = __nccwpck_require__(9984);
@@ -48322,35 +48321,35 @@ var visit = __nccwpck_require__(204);
 
 
 
-__webpack_unused_export__ = composer.Composer;
-__webpack_unused_export__ = Document.Document;
-__webpack_unused_export__ = Schema.Schema;
-__webpack_unused_export__ = errors.YAMLError;
-__webpack_unused_export__ = errors.YAMLParseError;
-__webpack_unused_export__ = errors.YAMLWarning;
-__webpack_unused_export__ = Alias.Alias;
-__webpack_unused_export__ = identity.isAlias;
-__webpack_unused_export__ = identity.isCollection;
-__webpack_unused_export__ = identity.isDocument;
-__webpack_unused_export__ = identity.isMap;
-__webpack_unused_export__ = identity.isNode;
-__webpack_unused_export__ = identity.isPair;
-__webpack_unused_export__ = identity.isScalar;
-__webpack_unused_export__ = identity.isSeq;
-__webpack_unused_export__ = Pair.Pair;
-__webpack_unused_export__ = Scalar.Scalar;
-__webpack_unused_export__ = YAMLMap.YAMLMap;
-__webpack_unused_export__ = YAMLSeq.YAMLSeq;
-__webpack_unused_export__ = cst;
-__webpack_unused_export__ = lexer.Lexer;
-__webpack_unused_export__ = lineCounter.LineCounter;
-__webpack_unused_export__ = parser.Parser;
-__webpack_unused_export__ = publicApi.parse;
-__webpack_unused_export__ = publicApi.parseAllDocuments;
-__webpack_unused_export__ = publicApi.parseDocument;
-__webpack_unused_export__ = publicApi.stringify;
-__webpack_unused_export__ = visit.visit;
-__webpack_unused_export__ = visit.visitAsync;
+exports.Composer = composer.Composer;
+exports.Document = Document.Document;
+exports.Schema = Schema.Schema;
+exports.YAMLError = errors.YAMLError;
+exports.YAMLParseError = errors.YAMLParseError;
+exports.YAMLWarning = errors.YAMLWarning;
+exports.Alias = Alias.Alias;
+exports.isAlias = identity.isAlias;
+exports.isCollection = identity.isCollection;
+exports.isDocument = identity.isDocument;
+exports.isMap = identity.isMap;
+exports.isNode = identity.isNode;
+exports.isPair = identity.isPair;
+exports.isScalar = identity.isScalar;
+exports.isSeq = identity.isSeq;
+exports.Pair = Pair.Pair;
+exports.Scalar = Scalar.Scalar;
+exports.YAMLMap = YAMLMap.YAMLMap;
+exports.YAMLSeq = YAMLSeq.YAMLSeq;
+exports.CST = cst;
+exports.Lexer = lexer.Lexer;
+exports.LineCounter = lineCounter.LineCounter;
+exports.Parser = parser.Parser;
+exports.parse = publicApi.parse;
+exports.parseAllDocuments = publicApi.parseAllDocuments;
+exports.parseDocument = publicApi.parseDocument;
+exports.stringify = publicApi.stringify;
+exports.visit = visit.visit;
+exports.visitAsync = visit.visitAsync;
 
 
 /***/ }),
@@ -64069,14 +64068,17 @@ async function resolveBundleId(repositoryRoot, config) {
     ];
     const bundleId = matches.at(-1)?.[1]?.trim();
     if (!bundleId || bundleId.includes("$(")) {
-        throw new errors_ShipError("Could not detect PRODUCT_BUNDLE_IDENTIFIER. Set platforms.ios.bundleId in .ship-my-flutter/config.json.", "BUNDLE_ID_REQUIRED");
+        throw new errors_ShipError("Could not detect PRODUCT_BUNDLE_IDENTIFIER. Set platforms.ios.bundleId in .ship-my-flutter/config.yaml.", "BUNDLE_ID_REQUIRED");
     }
     return bundleId;
 }
 //# sourceMappingURL=project.js.map
 ;// CONCATENATED MODULE: external "node:os"
 const external_node_os_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:os");
+// EXTERNAL MODULE: ./node_modules/yaml/dist/index.js
+var yaml_dist = __nccwpck_require__(8815);
 ;// CONCATENATED MODULE: ./vendor/ship-my-flutter/dist/json.js
+
 
 
 async function readJson(filePath) {
@@ -64086,6 +64088,17 @@ async function readJson(filePath) {
 async function json_writeJson(filePath, value) {
     await promises_namespaceObject.mkdir(external_node_path_namespaceObject.dirname(filePath), { recursive: true });
     await promises_namespaceObject.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+async function readYaml(filePath) {
+    const source = await promises_namespaceObject.readFile(filePath, "utf8");
+    return yaml_dist.parse(source);
+}
+async function json_writeYaml(filePath, value, schemaUrl) {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    const schemaDirective = schemaUrl
+        ? `# yaml-language-server: $schema=${schemaUrl}\n\n`
+        : "";
+    await fs.writeFile(filePath, `${schemaDirective}${YAML.stringify(value)}`, "utf8");
 }
 async function json_fileExists(filePath) {
     try {
@@ -72768,7 +72781,7 @@ function paths_resolveShipPaths(root = process.cwd()) {
     return {
         root,
         directory,
-        config: external_node_path_namespaceObject.join(directory, "config.json"),
+        config: external_node_path_namespaceObject.join(directory, "config.yaml"),
         manifest: external_node_path_namespaceObject.join(directory, "manifest.json"),
         changelog: external_node_path_namespaceObject.join(directory, "changelog.json"),
         storeReleaseNotes: external_node_path_namespaceObject.join(directory, "store-release-notes.json"),
@@ -72919,7 +72932,7 @@ function config_parse(schema, value, source) {
 }
 async function loadConfig(root = process.cwd()) {
     const paths = paths_resolveShipPaths(root);
-    return config_parse(configSchema, await readJson(paths.config), paths.config);
+    return config_parse(configSchema, await readYaml(paths.config), paths.config);
 }
 async function loadManifest(root = process.cwd()) {
     const paths = paths_resolveShipPaths(root);
@@ -73026,9 +73039,10 @@ async function configureBotIdentity(root) {
 
 
 
+
 const excluded = new Set([
     ".ship-my-flutter/changelog.json",
-    ".ship-my-flutter/config.json",
+    ".ship-my-flutter/config.yaml",
     ".ship-my-flutter/store-release-notes.json",
 ]);
 function shouldInclude(file) {
@@ -73054,9 +73068,9 @@ async function sourceFingerprint(root) {
             : await promises_namespaceObject.readFile(filePath));
         hash.update("\0");
     }
-    const configPath = external_node_path_namespaceObject.join(root, ".ship-my-flutter", "config.json");
+    const configPath = external_node_path_namespaceObject.join(root, ".ship-my-flutter", "config.yaml");
     try {
-        const config = JSON.parse(await promises_namespaceObject.readFile(configPath, "utf8"));
+        const config = yaml_dist.parse(await promises_namespaceObject.readFile(configPath, "utf8"));
         const ios = config.platforms?.ios;
         hash.update(".ship-my-flutter/config.build-inputs\0");
         hash.update(JSON.stringify({
@@ -74140,8 +74154,6 @@ async function promoteIosRelease(options) {
     };
 }
 //# sourceMappingURL=promote.js.map
-// EXTERNAL MODULE: ./node_modules/yaml/dist/index.js
-var yaml_dist = __nccwpck_require__(8815);
 ;// CONCATENATED MODULE: ./vendor/ship-my-flutter/dist/manifest-files.js
 
 
@@ -74218,6 +74230,7 @@ function manifest_files_emptyChangelog() {
 
 
 
+const configSchemaUrl = "https://raw.githubusercontent.com/Ventairy/ship-my-flutter/main/schemas/config.schema.json";
 async function detectFlutterVersion(root) {
     const pubspecPath = path.join(root, "pubspec.yaml");
     if (!(await fileExists(pubspecPath)))
@@ -74274,7 +74287,7 @@ async function initialize(options) {
     const workflowTemplate = __nccwpck_require__.ab + "ship-my-flutter.yml";
     await fs.mkdir(paths.candidates, { recursive: true });
     const writes = [
-        writeJson(paths.config, config),
+        writeYaml(paths.config, config, configSchemaUrl),
         writeJson(paths.manifest, manifest),
         writeJson(paths.changelog, emptyChangelog()),
         writeJson(paths.storeReleaseNotes, notes),

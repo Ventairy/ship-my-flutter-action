@@ -2,7 +2,7 @@ import path from "node:path";
 import semver from "semver";
 import { z } from "zod";
 import { ShipError } from "./errors.js";
-import { readJson } from "./json.js";
+import { readJson, readYaml } from "./json.js";
 import { resolveShipPaths } from "./paths.js";
 const relativePath = z
     .string()
@@ -146,7 +146,7 @@ function parse(schema, value, source) {
 }
 export async function loadConfig(root = process.cwd()) {
     const paths = resolveShipPaths(root);
-    return parse(configSchema, await readJson(paths.config), paths.config);
+    return parse(configSchema, await readYaml(paths.config), paths.config);
 }
 export async function loadManifest(root = process.cwd()) {
     const paths = resolveShipPaths(root);
