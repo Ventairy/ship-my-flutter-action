@@ -1,3 +1,6 @@
+.agents/
+coverage/
 dist/
+node_modules/
+pnpm-lock.yaml
 vendor/
-package-lock.json

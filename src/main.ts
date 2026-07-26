@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as github from "@actions/github";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,10 +34,16 @@ function phase(): Phase {
 }
 
 function repository(): string {
-  const owner = github.context.repo.owner;
-  const repo = github.context.repo.repo;
-  if (!owner || !repo) throw new Error("GitHub repository context is missing.");
-  return `${owner}/${repo}`;
+  const value = process.env.GITHUB_REPOSITORY?.trim();
+  const parts = value?.split("/");
+  if (
+    parts?.length !== 2 ||
+    parts[0]?.trim() === "" ||
+    parts[1]?.trim() === ""
+  ) {
+    throw new Error("GitHub repository context is missing or invalid.");
+  }
+  return `${parts[0]}/${parts[1]}`;
 }
 
 function childEnvironment(): Record<string, string> {
@@ -98,13 +103,13 @@ function optionalPositiveInteger(
 ): number | undefined {
   const value = result[name];
   if (value === undefined) return undefined;
-  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
     throw new Error(
       `ship-my-flutter returned an invalid ${context} result: ` +
         `"${name}" must be a positive integer.`,
     );
   }
-  return value as number;
+  return value;
 }
 
 function iosPlatform(result: JsonObject, context: string): "ios" {
@@ -235,8 +240,10 @@ export async function run(): Promise<void> {
   mapOutputs(selected, parseResult(result.stdout));
 }
 
+/* v8 ignore start -- exercised by GitHub's process-level Action entrypoint. */
 if (process.env.NODE_ENV !== "test") {
   run().catch((error: unknown) => {
     core.setFailed(error instanceof Error ? error.message : String(error));
   });
 }
+/* v8 ignore stop */

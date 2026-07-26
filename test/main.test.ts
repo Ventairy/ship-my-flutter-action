@@ -1,16 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const setOutput = vi.fn();
 const setFailed = vi.fn();
 const setSecret = vi.fn();
 const info = vi.fn();
 const getExecOutput = vi.fn();
+const originalEnvironment = { ...process.env };
 
 vi.mock("@actions/core", () => ({ setOutput, setFailed, setSecret, info }));
 vi.mock("@actions/exec", () => ({ getExecOutput }));
-vi.mock("@actions/github", () => ({
-  context: { repo: { owner: "ventairy", repo: "example" } },
-}));
 
 const { run } = await import("../src/main.js");
 
@@ -18,7 +16,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.GITHUB_WORKSPACE = "/workspace";
   process.env.GITHUB_ACTION_PATH = "/action";
+  process.env.GITHUB_REPOSITORY = "ventairy/example";
   process.env.INPUT_GITHUB_TOKEN = "token";
+});
+
+afterEach(() => {
+  for (const name of Object.keys(process.env)) {
+    if (!(name in originalEnvironment)) delete process.env[name];
+  }
+  Object.assign(process.env, originalEnvironment);
 });
 
 describe("action adapter", () => {
@@ -63,10 +69,32 @@ describe("action adapter", () => {
   });
 
   it("rejects candidate builds on a non-macOS runner", async () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     process.env.INPUT_PHASE = "candidate";
-    if (process.platform === "darwin") return;
+
     await expect(run()).rejects.toThrow(/macOS runner/);
     expect(getExecOutput).not.toHaveBeenCalled();
+  });
+
+  it("maps a complete candidate result on macOS", async () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+    process.env.INPUT_PHASE = "candidate";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        platform: "ios",
+        version: "1.2.0",
+        buildId: "build-7",
+        buildNumber: "7",
+      }),
+    });
+
+    await run();
+
+    expect(setOutput).toHaveBeenCalledWith("phase", "candidate");
+    expect(setOutput).toHaveBeenCalledWith("build-id", "build-7");
+    expect(setOutput).toHaveBeenCalledWith("build-number", "7");
   });
 
   it("maps promotion results without implementing promotion logic", async () => {
@@ -90,6 +118,40 @@ describe("action adapter", () => {
       "release-url",
       "https://github.com/ventairy/example/releases/ios-v2.0.0",
     );
+  });
+
+  it("maps a terminal noop plan without optional outputs", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({ phase: "noop" }),
+    });
+
+    await run();
+
+    expect(setOutput).toHaveBeenCalledTimes(1);
+    expect(setOutput).toHaveBeenCalledWith("phase", "noop");
+  });
+
+  it("maps a promotion plan without candidate-only outputs", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "promote",
+        platform: "ios",
+        version: "2.0.0",
+      }),
+    });
+
+    await run();
+
+    expect(setOutput).toHaveBeenCalledWith("phase", "promote");
+    expect(setOutput).toHaveBeenCalledWith("platform", "ios");
+    expect(setOutput).toHaveBeenCalledWith("version", "2.0.0");
+    expect(setOutput).not.toHaveBeenCalledWith("branch", expect.anything());
   });
 
   it("rejects a plan result without an explicit supported phase", async () => {
@@ -141,8 +203,8 @@ describe("action adapter", () => {
   });
 
   it("rejects an incomplete direct candidate result", async () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
     process.env.INPUT_PHASE = "candidate";
-    if (process.platform !== "darwin") return;
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
@@ -156,6 +218,21 @@ describe("action adapter", () => {
     await expect(run()).rejects.toThrow(
       'invalid candidate result: "buildId" must be a non-empty string',
     );
+  });
+
+  it("rejects a non-iOS platform result", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "promote",
+        platform: "android",
+        version: "2.0.0",
+      }),
+    });
+
+    await expect(run()).rejects.toThrow('"platform" must be "ios"');
   });
 
   it("rejects an incomplete promotion result", async () => {
@@ -183,6 +260,75 @@ describe("action adapter", () => {
     });
     await expect(run()).rejects.toThrow("[CONFIG]: invalid configuration");
     expect(setOutput).not.toHaveBeenCalled();
+  });
+
+  it("uses a stable fallback when Dart fails without diagnostics", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 1,
+      stderr: "",
+      stdout: "",
+    });
+
+    await expect(run()).rejects.toThrow("The Dart CLI failed.");
+  });
+
+  it("rejects invalid JSON returned by Dart", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: "not-json",
+    });
+
+    await expect(run()).rejects.toThrow("returned invalid JSON");
+  });
+
+  it.each(["null", "[]", '"text"'])(
+    "rejects a non-object Dart result: %s",
+    async (stdout) => {
+      process.env.INPUT_PHASE = "plan";
+      getExecOutput.mockResolvedValue({
+        exitCode: 0,
+        stderr: "",
+        stdout,
+      });
+
+      await expect(run()).rejects.toThrow("returned an invalid result");
+    },
+  );
+
+  it("requires the GitHub token before launching Dart", async () => {
+    process.env.INPUT_PHASE = "plan";
+    process.env.INPUT_GITHUB_TOKEN = " ";
+
+    await expect(run()).rejects.toThrow("github-token is required");
+    expect(getExecOutput).not.toHaveBeenCalled();
+  });
+
+  it("requires a complete GitHub repository context", async () => {
+    process.env.INPUT_PHASE = "plan";
+    process.env.GITHUB_REPOSITORY = "ventairy";
+
+    await expect(run()).rejects.toThrow(
+      "repository context is missing or invalid",
+    );
+    expect(getExecOutput).not.toHaveBeenCalled();
+  });
+
+  it("masks every supplied release credential before execution", async () => {
+    process.env.INPUT_PHASE = "plan";
+    process.env.SHIP_MY_FLUTTER_IOS_CERTIFICATE_PASSWORD = "p12-password";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({ phase: "noop" }),
+    });
+
+    await run();
+
+    expect(setSecret).toHaveBeenCalledWith("token");
+    expect(setSecret).toHaveBeenCalledWith("p12-password");
   });
 
   it("rejects unknown phases before launching Dart", async () => {

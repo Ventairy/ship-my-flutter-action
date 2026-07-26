@@ -10,6 +10,10 @@ All notable changes to ship-my-flutter-action are documented here.
 - Pinned Dart and Flutter setup dependencies, vendored Dart core/lockfile, and
   a thin native TypeScript adapter.
 - Hosted byte-for-byte verification of vendored core provenance.
+- Pinned pnpm development workflow with frozen installs, package-signature
+  auditing, dependency-age safeguards, and enforced coverage thresholds.
+- Pull-request dependency review for newly introduced high-severity
+  vulnerabilities.
 
 ### Fixed
 
@@ -17,3 +21,5 @@ All notable changes to ship-my-flutter-action are documented here.
   plausible default Action outputs.
 - Document the App Store Connect roles required by upload-only and complete
   TestFlight/App Review workflows.
+- Read and validate the native repository context directly instead of bundling
+  an otherwise unused GitHub API client.

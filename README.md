@@ -1,5 +1,7 @@
 # ship-my-flutter-action
 
+[![CI](https://github.com/Ventairy/ship-my-flutter-action/actions/workflows/ci.yml/badge.svg)](https://github.com/Ventairy/ship-my-flutter-action/actions/workflows/ci.yml)
+
 The official GitHub Action for [ship-my-flutter](https://github.com/Ventairy/ship-my-flutter).
 
 > [!WARNING]
@@ -154,11 +156,11 @@ After a core change, start from a clean adjacent core checkout. Run
 generates the Action's deployment lockfile:
 
 ```bash
-npm run vendor-core
-npm ci
-npm run format
+pnpm run vendor-core
+pnpm install --frozen-lockfile
+pnpm run format
 dart pub get --enforce-lockfile -C vendor/ship-my-flutter
-npm run check
+pnpm run check
 ```
 
 Review both generated diffs before release. See the core [release procedure](https://github.com/Ventairy/ship-my-flutter/blob/main/RELEASING.md).

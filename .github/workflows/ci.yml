@@ -10,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+
   check:
     runs-on: ubuntu-latest
     strategy:
@@ -17,17 +27,23 @@ jobs:
         node: [20, 22, 24]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-          package-manager-cache: false
       - uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
         with:
           sdk: 3.10.0
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       - run: dart pub get --enforce-lockfile -C vendor/ship-my-flutter
-      - run: npm run check
+      - run: pnpm run check
+      - if: matrix.node == 20
+        run: pnpm run audit:prod
+      - if: matrix.node == 20
+        run: pnpm run audit
+      - if: matrix.node == 20
+        run: pnpm run audit:signatures
       - run: git diff --exit-code -- dist
       - id: core
         if: matrix.node == 20

@@ -1,11 +1,11 @@
 # Contributing
 
-Install Node.js, npm, and Dart 3.10 or newer, then run:
+Install Node.js, pnpm 11, and Dart 3.10 or newer, then run:
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 dart pub get --enforce-lockfile -C vendor/ship-my-flutter
-npm run check
+pnpm run check
 ```
 
 Use Conventional Commits and keep source, tests, the vendored core, its
@@ -18,10 +18,10 @@ To refresh the core from the clean sibling checkout, run `vendor-core` with
 Dart 3.10. It copies the core and generates the Action's committed lockfile:
 
 ```bash
-npm run vendor-core
-npm ci
+pnpm run vendor-core
+pnpm install --frozen-lockfile
 dart pub get --enforce-lockfile -C vendor/ship-my-flutter
-npm run check
+pnpm run check
 ```
 
 Never use production certificates, profiles, API keys, or app records in tests. Pull requests that change action inputs or outputs must update `action.yml`, tests, and the README together.
