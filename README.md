@@ -80,6 +80,13 @@ with write access selects **Approve workflows to run** in the PR. If those runs
 must start automatically, pass a GitHub App installation token (preferred) or a
 narrowly scoped personal access token through `github-token`.
 
+The repository or organization must also allow GitHub Actions to create pull
+requests. Enable **Settings → Actions → General → Workflow permissions → Allow
+GitHub Actions to create and approve pull requests**. If organization policy
+locks that option off, pass an allowed GitHub App installation token or
+fine-grained personal access token to `github-token`; Pull requests and Issues
+read/write access is sufficient for the plan API calls.
+
 ## Development
 
 The action checks in two generated artifacts:
