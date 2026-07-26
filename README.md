@@ -114,6 +114,8 @@ platforms:
 
 ship-my-flutter appends the planned version, next Apple build number, generated
 export-options plist, and configured flavor automatically.
+`build_command` must be one command invocation; put multi-step preparation,
+logging, and verification in `hooks.before_candidate`.
 
 If `hooks.before_release_pr` invokes Flutter, FVM, or a newer project Dart SDK,
 run the same project setup before the plan Action step. The Action preserves
