@@ -15,7 +15,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "vendor-core": "npm --prefix ../ship-my-flutter run build && node scripts/vendor-core.mjs"
+    "vendor-core": "node scripts/vendor-core.mjs"
   },
   "keywords": [
     "github-action",
@@ -31,8 +31,8 @@
   },
   "dependencies": {
     "@actions/core": "3.0.1",
-    "@actions/github": "9.1.1",
-    "ship-my-flutter": "file:vendor/ship-my-flutter"
+    "@actions/exec": "3.0.0",
+    "@actions/github": "9.1.1"
   },
   "devDependencies": {
     "@types/node": "26.1.1",

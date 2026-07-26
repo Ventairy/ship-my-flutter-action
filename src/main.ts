@@ -1,36 +1,27 @@
 import * as core from "@actions/core";
+import * as exec from "@actions/exec";
 import * as github from "@actions/github";
-import {
-  appleCredentialsFromEnvironment,
-  createIosCandidate,
-  planGitHubRelease,
-  promoteIosRelease,
-  signingCredentialsFromEnvironment,
-  type GitHubContext,
-} from "ship-my-flutter";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 type Phase = "plan" | "candidate" | "promote";
+type JsonObject = Record<string, unknown>;
 
 const sensitiveEnvironmentNames = [
   "INPUT_GITHUB_TOKEN",
-  "SMF_APP_STORE_CONNECT_KEY_ID",
-  "SMF_APP_STORE_CONNECT_ISSUER_ID",
-  "SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64",
-  "SMF_IOS_CERTIFICATE_BASE64",
-  "SMF_IOS_CERTIFICATE_PASSWORD",
-  "SMF_IOS_PROVISIONING_PROFILES_BASE64",
+  "SHIP_MY_FLUTTER_GITHUB_TOKEN",
+  "SHIP_MY_FLUTTER_APP_STORE_CONNECT_KEY_ID",
+  "SHIP_MY_FLUTTER_APP_STORE_CONNECT_ISSUER_ID",
+  "SHIP_MY_FLUTTER_APP_STORE_CONNECT_PRIVATE_KEY_BASE64",
+  "SHIP_MY_FLUTTER_IOS_CERTIFICATE_BASE64",
+  "SHIP_MY_FLUTTER_IOS_CERTIFICATE_PASSWORD",
+  "SHIP_MY_FLUTTER_IOS_PROVISIONING_PROFILES_BASE64",
 ] as const;
 
 function maskSensitiveInputs(): void {
   for (const name of sensitiveEnvironmentNames) {
     const value = process.env[name];
     if (value) core.setSecret(value);
-  }
-}
-
-function clearSensitiveInputs(): void {
-  for (const name of sensitiveEnvironmentNames) {
-    delete process.env[name];
   }
 }
 
@@ -42,14 +33,46 @@ function phase(): Phase {
   throw new Error(`Unsupported phase "${value ?? ""}".`);
 }
 
-function githubContext(): GitHubContext {
+function repository(): string {
+  const owner = github.context.repo.owner;
+  const repo = github.context.repo.repo;
+  if (!owner || !repo) throw new Error("GitHub repository context is missing.");
+  return `${owner}/${repo}`;
+}
+
+function childEnvironment(): Record<string, string> {
+  const environment: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value !== undefined) environment[name] = value;
+  }
   const token = process.env.INPUT_GITHUB_TOKEN?.trim();
   if (!token) throw new Error("github-token is required.");
-  return {
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    token,
-  };
+  delete environment.INPUT_GITHUB_TOKEN;
+  environment.SHIP_MY_FLUTTER_GITHUB_TOKEN = token;
+  for (const name of sensitiveEnvironmentNames) {
+    delete process.env[name];
+  }
+  return environment;
+}
+
+function coreDirectory(): string {
+  const actionPath =
+    process.env.GITHUB_ACTION_PATH ??
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  return path.join(actionPath, "vendor", "ship-my-flutter");
+}
+
+function parseResult(stdout: string): JsonObject {
+  let value: unknown;
+  try {
+    value = JSON.parse(stdout);
+  } catch {
+    throw new Error("ship-my-flutter returned invalid JSON.");
+  }
+  if (value === null || Array.isArray(value) || typeof value !== "object") {
+    throw new Error("ship-my-flutter returned an invalid result.");
+  }
+  return value as JsonObject;
 }
 
 function setOptionalOutput(name: string, value: unknown): void {
@@ -58,64 +81,60 @@ function setOptionalOutput(name: string, value: unknown): void {
   }
 }
 
-export async function run(): Promise<void> {
-  maskSensitiveInputs();
-  const selected = phase();
-  const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
-  core.info(
-    `Running ${selected} for ${github.context.repo.owner}/${github.context.repo.repo}`,
-  );
-
+function mapOutputs(selected: Phase, result: JsonObject): void {
   if (selected === "plan") {
-    const githubApi = githubContext();
-    clearSensitiveInputs();
-    const result = await planGitHubRelease({
-      root: repositoryRoot,
-      github: githubApi,
-    });
-    core.setOutput("phase", result.phase);
+    core.setOutput("phase", String(result.phase ?? "noop"));
     setOptionalOutput("platform", result.platform);
     setOptionalOutput("version", result.version);
     setOptionalOutput("branch", result.branch);
     setOptionalOutput("pull-request-number", result.pullRequestNumber);
     return;
   }
-
+  core.setOutput("phase", selected);
+  core.setOutput("platform", String(result.platform ?? "ios"));
+  setOptionalOutput("version", result.version);
+  setOptionalOutput("build-id", result.buildId);
   if (selected === "candidate") {
-    if (process.platform !== "darwin") {
-      throw new Error("The candidate phase requires a macOS runner.");
-    }
-    const appleCredentials = appleCredentialsFromEnvironment();
-    const signingCredentials = signingCredentialsFromEnvironment();
-    const githubApi = githubContext();
-    clearSensitiveInputs();
-    const receipt = await createIosCandidate({
-      root: repositoryRoot,
-      appleCredentials,
-      signingCredentials,
-      github: githubApi,
-    });
-    core.setOutput("phase", "candidate");
-    core.setOutput("platform", receipt.platform);
-    core.setOutput("version", receipt.version);
-    core.setOutput("build-id", receipt.buildId);
-    core.setOutput("build-number", receipt.buildNumber);
-    return;
+    setOptionalOutput("build-number", result.buildNumber);
+  } else {
+    setOptionalOutput("release-url", result.githubReleaseUrl);
   }
+}
 
-  const appleCredentials = appleCredentialsFromEnvironment();
-  const githubApi = githubContext();
-  clearSensitiveInputs();
-  const result = await promoteIosRelease({
-    root: repositoryRoot,
-    appleCredentials,
-    github: githubApi,
-  });
-  core.setOutput("phase", "promote");
-  core.setOutput("platform", "ios");
-  core.setOutput("version", result.version);
-  core.setOutput("build-id", result.buildId);
-  core.setOutput("release-url", result.githubReleaseUrl);
+export async function run(): Promise<void> {
+  maskSensitiveInputs();
+  const selected = phase();
+  if (selected === "candidate" && process.platform !== "darwin") {
+    throw new Error("The candidate phase requires a macOS runner.");
+  }
+  const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
+  const repositoryName = repository();
+  core.info(`Running ${selected} for ${repositoryName}`);
+  const result = await exec.getExecOutput(
+    "dart",
+    [
+      "run",
+      "ship_my_flutter",
+      "action",
+      "--phase",
+      selected,
+      "--root",
+      repositoryRoot,
+      "--repository",
+      repositoryName,
+    ],
+    {
+      cwd: coreDirectory(),
+      env: childEnvironment(),
+      silent: true,
+      ignoreReturnCode: true,
+    },
+  );
+  if (result.exitCode !== 0) {
+    const message = result.stderr.trim() || "The Dart CLI failed.";
+    throw new Error(message);
+  }
+  mapOutputs(selected, parseResult(result.stdout));
 }
 
 if (process.env.NODE_ENV !== "test") {

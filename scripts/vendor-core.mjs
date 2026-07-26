@@ -8,41 +8,27 @@ const actionRoot = path.resolve(
 );
 const coreRoot = path.resolve(actionRoot, "..", "ship-my-flutter");
 const destination = path.join(actionRoot, "vendor", "ship-my-flutter");
-const sourcePackage = JSON.parse(
-  await fs.readFile(path.join(coreRoot, "package.json"), "utf8"),
-);
 
 await fs.rm(destination, { recursive: true, force: true });
 await fs.mkdir(destination, { recursive: true });
 await Promise.all([
-  fs.cp(path.join(coreRoot, "dist"), path.join(destination, "dist"), {
+  fs.cp(path.join(coreRoot, "bin"), path.join(destination, "bin"), {
     recursive: true,
   }),
-  fs.cp(path.join(coreRoot, "schemas"), path.join(destination, "schemas"), {
+  fs.cp(path.join(coreRoot, "lib"), path.join(destination, "lib"), {
     recursive: true,
   }),
-  fs.cp(path.join(coreRoot, "templates"), path.join(destination, "templates"), {
-    recursive: true,
-  }),
+  fs.copyFile(
+    path.join(coreRoot, "pubspec.yaml"),
+    path.join(destination, "pubspec.yaml"),
+  ),
+  fs.copyFile(
+    path.join(coreRoot, "pubspec.lock"),
+    path.join(destination, "pubspec.lock"),
+  ),
   fs.copyFile(
     path.join(coreRoot, "LICENSE"),
     path.join(destination, "LICENSE"),
   ),
   fs.copyFile(path.join(coreRoot, "NOTICE"), path.join(destination, "NOTICE")),
 ]);
-await fs.writeFile(
-  path.join(destination, "package.json"),
-  `${JSON.stringify(
-    {
-      name: sourcePackage.name,
-      version: sourcePackage.version,
-      type: sourcePackage.type,
-      main: sourcePackage.main,
-      types: sourcePackage.types,
-      exports: sourcePackage.exports,
-      dependencies: sourcePackage.dependencies,
-    },
-    null,
-    2,
-  )}\n`,
-);

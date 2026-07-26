@@ -113,16 +113,25 @@ runs:
         cache: "true"
         pub-cache: "true"
 
+    - name: Set up Dart
+      uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
+      with:
+        sdk: 3.10.0
+
+    - name: Resolve ship-my-flutter dependencies
+      shell: bash
+      run: dart pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/ship-my-flutter"
+
     - name: Ship my Flutter
       id: run
       shell: bash
       env:
         INPUT_PHASE: ${{ inputs.phase }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
-        SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
-        SMF_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
-        SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}
-        SMF_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
-        SMF_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
-        SMF_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
+        SHIP_MY_FLUTTER_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
+        SHIP_MY_FLUTTER_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
+        SHIP_MY_FLUTTER_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}
+        SHIP_MY_FLUTTER_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
+        SHIP_MY_FLUTTER_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
+        SHIP_MY_FLUTTER_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
       run: node "$GITHUB_ACTION_PATH/dist/index.js"

@@ -4,28 +4,12 @@ const setOutput = vi.fn();
 const setFailed = vi.fn();
 const setSecret = vi.fn();
 const info = vi.fn();
-const planGitHubRelease = vi.fn();
-const createIosCandidate = vi.fn();
-const promoteIosRelease = vi.fn();
+const getExecOutput = vi.fn();
 
 vi.mock("@actions/core", () => ({ setOutput, setFailed, setSecret, info }));
+vi.mock("@actions/exec", () => ({ getExecOutput }));
 vi.mock("@actions/github", () => ({
   context: { repo: { owner: "ventairy", repo: "example" } },
-}));
-vi.mock("ship-my-flutter", () => ({
-  appleCredentialsFromEnvironment: vi.fn(() => ({
-    keyId: "key",
-    issuerId: "issuer",
-    privateKey: "private",
-  })),
-  signingCredentialsFromEnvironment: vi.fn(() => ({
-    certificateBase64: "certificate",
-    certificatePassword: "password",
-    provisioningProfiles: "profile",
-  })),
-  createIosCandidate,
-  planGitHubRelease,
-  promoteIosRelease,
 }));
 
 const { run } = await import("../src/main.js");
@@ -33,30 +17,45 @@ const { run } = await import("../src/main.js");
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.GITHUB_WORKSPACE = "/workspace";
+  process.env.GITHUB_ACTION_PATH = "/action";
   process.env.INPUT_GITHUB_TOKEN = "token";
 });
 
-describe("action entrypoint", () => {
-  it("maps release planning to action outputs", async () => {
+describe("action adapter", () => {
+  it("invokes Dart and maps release planning to native action outputs", async () => {
     process.env.INPUT_PHASE = "plan";
-    planGitHubRelease.mockResolvedValue({
-      phase: "candidate",
-      platform: "ios",
-      version: "1.2.0",
-      branch: "ship-my-flutter/ios",
-      pullRequestNumber: 12,
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "candidate",
+        platform: "ios",
+        version: "1.2.0",
+        branch: "ship-my-flutter/ios",
+        pullRequestNumber: 12,
+      }),
     });
 
     await run();
 
-    expect(planGitHubRelease).toHaveBeenCalledWith({
-      root: "/workspace",
-      github: {
-        owner: "ventairy",
-        repo: "example",
-        token: "token",
-      },
-    });
+    expect(getExecOutput).toHaveBeenCalledWith(
+      "dart",
+      [
+        "run",
+        "ship_my_flutter",
+        "action",
+        "--phase",
+        "plan",
+        "--root",
+        "/workspace",
+        "--repository",
+        "ventairy/example",
+      ],
+      expect.objectContaining({
+        cwd: "/action/vendor/ship-my-flutter",
+        silent: true,
+      }),
+    );
     expect(setOutput).toHaveBeenCalledWith("phase", "candidate");
     expect(setOutput).toHaveBeenCalledWith("pull-request-number", "12");
     expect(setSecret).toHaveBeenCalledWith("token");
@@ -67,16 +66,20 @@ describe("action entrypoint", () => {
     process.env.INPUT_PHASE = "candidate";
     if (process.platform === "darwin") return;
     await expect(run()).rejects.toThrow(/macOS runner/);
-    expect(createIosCandidate).not.toHaveBeenCalled();
+    expect(getExecOutput).not.toHaveBeenCalled();
   });
 
-  it("maps promotion results to immutable release outputs", async () => {
+  it("maps promotion results without implementing promotion logic", async () => {
     process.env.INPUT_PHASE = "promote";
-    promoteIosRelease.mockResolvedValue({
-      version: "2.0.0",
-      buildId: "build-42",
-      githubReleaseUrl:
-        "https://github.com/ventairy/example/releases/ios-v2.0.0",
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        version: "2.0.0",
+        buildId: "build-42",
+        githubReleaseUrl:
+          "https://github.com/ventairy/example/releases/ios-v2.0.0",
+      }),
     });
 
     await run();
@@ -89,8 +92,20 @@ describe("action entrypoint", () => {
     );
   });
 
-  it("rejects unknown phases", async () => {
+  it("surfaces a failed Dart command without parsing output", async () => {
+    process.env.INPUT_PHASE = "plan";
+    getExecOutput.mockResolvedValue({
+      exitCode: 1,
+      stderr: "ship-my-flutter [CONFIG]: invalid configuration",
+      stdout: "",
+    });
+    await expect(run()).rejects.toThrow("[CONFIG]: invalid configuration");
+    expect(setOutput).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown phases before launching Dart", async () => {
     process.env.INPUT_PHASE = "destroy";
     await expect(run()).rejects.toThrow('Unsupported phase "destroy"');
+    expect(getExecOutput).not.toHaveBeenCalled();
   });
 });

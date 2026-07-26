@@ -17,14 +17,17 @@ It exposes the full release lifecycle through one action:
 - `candidate` builds, signs, uploads, and records the exact TestFlight build;
 - `promote` submits that recorded build after the release PR merges.
 
-The core CLI is vendored into the bundle, so consumer repositories do not install Node packages or Fastlane.
+The Action vendors the exact Dart core source and lockfile. It installs its own
+pinned Dart SDK and resolves that lockfile automatically, so consumer
+repositories do not install Node packages or Fastlane.
 
 ## Use
 
 Run the initializer from the Flutter repository:
 
 ```bash
-npx ship-my-flutter init \
+dart pub add --dev ship_my_flutter
+dart run ship_my_flutter init \
   --current-version 1.0.0 \
   --bundle-id com.example.myapp
 ```
@@ -109,16 +112,25 @@ configuration opt-in.
 
 ## Development
 
-The action checks in two generated artifacts:
+The Action is deliberately hybrid:
 
-- `vendor/ship-my-flutter`: compiled core snapshot;
-- `dist`: the bundled action.
+- Dart owns release planning, GitHub operations, signing, TestFlight, App Store
+  Connect, the public CLI, and the reusable library API.
+- TypeScript only reads native Action inputs/context, masks secrets, launches
+  Dart, maps failures, and writes outputs.
+
+The repository checks in two generated artifacts:
+
+- `vendor/ship-my-flutter`: exact Dart package source and lockfile;
+- `dist`: bundled thin TypeScript Action adapter.
 
 After a core change:
 
 ```bash
 npm run vendor-core
 npm install
+npm run format
+dart pub get --enforce-lockfile -C vendor/ship-my-flutter
 npm run check
 ```
 
