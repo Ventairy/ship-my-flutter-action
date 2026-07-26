@@ -14,18 +14,6 @@ inputs:
     description: GitHub token used for release PRs, receipts, labels, and releases.
     required: false
     default: ${{ github.token }}
-  flutter-channel:
-    description: Flutter channel used for candidate builds.
-    required: false
-    default: stable
-  flutter-version:
-    description: Exact Flutter version or version expression used for candidate builds.
-    required: false
-    default: ""
-  flutter-version-file:
-    description: pubspec.yaml, .fvmrc, or fvm_config.json containing the Flutter version.
-    required: false
-    default: ""
   app-store-connect-key-id:
     description: App Store Connect API key ID.
     required: false
@@ -74,53 +62,37 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Resolve Flutter version
-      id: flutter-config
-      if: inputs.phase == 'candidate'
+    - name: Preserve consumer toolchain
+      id: consumer-toolchain
       shell: bash
-      env:
-        EXPLICIT_FLUTTER_VERSION: ${{ inputs.flutter-version }}
-        EXPLICIT_FLUTTER_VERSION_FILE: ${{ inputs.flutter-version-file }}
       run: |
-        if [[ -n "$EXPLICIT_FLUTTER_VERSION" && -n "$EXPLICIT_FLUTTER_VERSION_FILE" ]]; then
-          echo "Set flutter-version or flutter-version-file, not both." >&2
+        if [[ "$PATH" == *$'\n'* || "$PATH" == *$'\r'* ]]; then
+          echo "PATH cannot contain a newline." >&2
           exit 1
         fi
-
-        version_file="$EXPLICIT_FLUTTER_VERSION_FILE"
-        if [[ -z "$EXPLICIT_FLUTTER_VERSION" && -z "$version_file" ]]; then
-          for candidate in .fvmrc .fvm/fvm_config.json fvm_config.json; do
-            if [[ -f "$candidate" ]]; then
-              version_file="$candidate"
-              break
-            fi
-          done
-        fi
-
-        if [[ "$version_file" == *$'\n'* || "$version_file" == *$'\r'* ]]; then
-          echo "flutter-version-file cannot contain a newline." >&2
-          exit 1
-        fi
-        printf 'version-file=%s\n' "$version_file" >> "$GITHUB_OUTPUT"
-
-    - name: Set up Flutter
-      if: inputs.phase == 'candidate'
-      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-      with:
-        channel: ${{ inputs.flutter-channel }}
-        flutter-version: ${{ inputs.flutter-version }}
-        flutter-version-file: ${{ steps.flutter-config.outputs.version-file }}
-        cache: "true"
-        pub-cache: "true"
+        printf 'path=%s\n' "$PATH" >> "$GITHUB_OUTPUT"
 
     - name: Set up Dart
       uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
       with:
         sdk: 3.10.0
 
+    - name: Resolve core toolchain
+      id: core-toolchain
+      shell: bash
+      run: |
+        dart_path="$(command -v dart)"
+        if [[ -z "$dart_path" || "$dart_path" == *$'\n'* || "$dart_path" == *$'\r'* ]]; then
+          echo "Could not resolve the ship-my-flutter Dart executable." >&2
+          exit 1
+        fi
+        printf 'dart=%s\n' "$dart_path" >> "$GITHUB_OUTPUT"
+
     - name: Resolve ship-my-flutter dependencies
       shell: bash
-      run: dart pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/ship-my-flutter"
+      env:
+        CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
+      run: '"$CORE_DART" pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/ship-my-flutter"'
 
     - name: Ship my Flutter
       id: run
@@ -128,6 +100,8 @@ runs:
       env:
         INPUT_PHASE: ${{ inputs.phase }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        SHIP_MY_FLUTTER_CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
+        SHIP_MY_FLUTTER_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
         SHIP_MY_FLUTTER_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
         SHIP_MY_FLUTTER_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
         SHIP_MY_FLUTTER_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}

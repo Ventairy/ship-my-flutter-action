@@ -82,6 +82,8 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     process.env.INPUT_GITHUB_TOKEN = "not-a-real-token";
     process.env.INPUT_PHASE = "plan";
     process.env.PATH = `${path.dirname(dart)}${path.delimiter}${process.env.PATH ?? ""}`;
+    process.env.SHIP_MY_FLUTTER_CORE_DART = dart;
+    process.env.SHIP_MY_FLUTTER_CONSUMER_PATH = process.env.PATH;
     const { run } = await import("../src/main.js");
     await run();
 

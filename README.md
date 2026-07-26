@@ -23,7 +23,8 @@ It exposes the full release lifecycle through one action:
 The Action vendors the exact Dart core source and owns a generated deployment
 lockfile for it. It installs its own pinned Dart SDK and enforces that lockfile
 automatically, so consumer repositories do not install Node packages or
-Fastlane.
+Fastlane. It does not install Flutter or FVM: the app repository owns the
+toolchain used by its configured `build_command`.
 
 ## Use
 
@@ -50,6 +51,12 @@ complete multi-job workflow. Its essential action steps are:
   with:
     phase: plan
 
+- uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+  with:
+    flutter-version-file: ${{ hashFiles('.fvmrc') != '' && '.fvmrc' || '' }}
+    cache: true
+    pub-cache: true
+
 - uses: Ventairy/ship-my-flutter-action@v1
   with:
     phase: candidate
@@ -70,6 +77,11 @@ complete multi-job workflow. Its essential action steps are:
 
 > [!IMPORTANT]
 > The candidate phase requires macOS and the supported Xcode/Flutter toolchain.
+> Install the project's exact Flutter/FVM toolchain before the candidate Action
+> step. The generated workflow pins `subosito/flutter-action` to a reviewed
+> commit; projects using FVM can replace that setup with their established
+> bootstrap. A root `.fvmrc` is used automatically; repositories without one
+> receive current stable Flutter.
 > Use an App Store Connect API key with `Developer` access only for upload-only
 > delivery without TestFlight groups. Group assignment and App Review
 > submission require at least `App Manager` access.
@@ -82,9 +94,6 @@ complete multi-job workflow. Its essential action steps are:
 | -------------------------------------- | ----------------- | ------------- | --------------------------------------------------- |
 | `phase`                                | all               | yes           | `plan`, `candidate`, or `promote`                   |
 | `github-token`                         | all               | default token | Maintains PRs, receipts, labels, tags, and releases |
-| `flutter-channel`                      | candidate         | no            | Flutter channel; defaults to `stable`               |
-| `flutter-version`                      | candidate         | no            | Exact Flutter version/expression                    |
-| `flutter-version-file`                 | candidate         | auto-detected | Explicit `pubspec.yaml`, `.fvmrc`, or FVM config    |
 | `app-store-connect-key-id`             | candidate/promote | yes           | API key ID                                          |
 | `app-store-connect-issuer-id`          | candidate/promote | yes           | API issuer ID                                       |
 | `app-store-connect-private-key-base64` | candidate/promote | yes           | Base64 `.p8`                                        |
@@ -92,11 +101,23 @@ complete multi-job workflow. Its essential action steps are:
 | `ios-certificate-password`             | candidate         | yes           | `.p12` password                                     |
 | `ios-provisioning-profiles-base64`     | candidate         | yes           | Base64 profile or bundle-ID JSON map                |
 
-Set only one of `flutter-version` and `flutter-version-file`. When neither is
-set, the action looks for `.fvmrc`, `.fvm/fvm_config.json`, or
-`fvm_config.json` at the Git repository root, in that order; otherwise it
-installs the selected channel's current version. In a monorepo with app-local
-FVM configuration, pass its repository-relative path explicitly.
+The Action intentionally has no Flutter-version inputs. Configure the exact
+project toolchain in the workflow, then configure the project-owned shell build
+invocation in `.ship-my-flutter/config.yaml`:
+
+```yaml
+platforms:
+  ios:
+    build_command: fvm flutter build ipa --release
+    artifact_path: build/ios/ipa
+```
+
+ship-my-flutter appends the planned version, next Apple build number, generated
+export-options plist, and configured flavor automatically.
+
+If `hooks.before_release_pr` invokes Flutter, FVM, or a newer project Dart SDK,
+run the same project setup before the plan Action step. The Action preserves
+whatever toolchain `PATH` exists when each invocation begins.
 
 ## Outputs
 
@@ -140,6 +161,12 @@ The Action is deliberately hybrid:
   Connect, the public CLI, and the reusable library API.
 - TypeScript only reads native Action inputs/context, masks secrets, launches
   Dart, maps failures, and writes outputs.
+
+The Action captures the consumer's incoming `PATH` before installing its pinned
+Dart SDK. The core runs through the isolated Dart executable, while repository
+hooks and `build_command` inherit the original project toolchain path. This
+prevents the Action's Dart from replacing the Dart bundled with the project's
+Flutter SDK.
 
 The repository checks in two generated artifacts:
 

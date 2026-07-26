@@ -9,70 +9,11 @@ import '../model.dart';
 import '../paths.dart';
 import '../serialization.dart';
 import '../validate.dart';
+import 'candidate_options.dart';
 import 'client.dart';
-import 'project.dart';
-import 'signing.dart';
-import 'upload.dart';
 
-typedef InstallSigningAssets =
-    Future<SigningSession> Function(
-      SigningCredentials credentials,
-      String bundleId,
-    );
-typedef PrepareFlutterDependencies = Future<void> Function(String projectRoot);
-typedef BuildFlutterIpa =
-    Future<String> Function({
-      required String projectRoot,
-      required String version,
-      required String buildNumber,
-      required String exportOptionsPath,
-      String? scheme,
-      required List<String> buildArgs,
-    });
-typedef UploadIpa =
-    Future<void> Function(String ipaPath, AppleCredentials credentials);
-
-DateTime _currentTime() => DateTime.now().toUtc();
-
-final class CandidateDependencies {
-  const CandidateDependencies({
-    this.installSigning = installSigningAssets,
-    this.prepareDependencies = prepareFlutterDependencies,
-    this.buildIpa = buildFlutterIpa,
-    this.upload = uploadIpa,
-    this.resolveBundleIdentifier = resolveBundleId,
-    this.currentTime = _currentTime,
-  });
-
-  final InstallSigningAssets installSigning;
-  final PrepareFlutterDependencies prepareDependencies;
-  final BuildFlutterIpa buildIpa;
-  final UploadIpa upload;
-  final ResolveBundleId resolveBundleIdentifier;
-
-  /// Supplies the receipt timestamp, primarily for deterministic workflows.
-  final DateTime Function() currentTime;
-}
-
-final class CandidateOptions {
-  const CandidateOptions({
-    required this.root,
-    required this.appleCredentials,
-    required this.signingCredentials,
-    this.github,
-    this.commitReceipt = true,
-    this.client,
-    this.dependencies = const CandidateDependencies(),
-  });
-
-  final String root;
-  final AppleCredentials appleCredentials;
-  final SigningCredentials signingCredentials;
-  final GitHubContext? github;
-  final bool commitReceipt;
-  final AppStoreConnectApi? client;
-  final CandidateDependencies dependencies;
-}
+export 'candidate_dependencies.dart';
+export 'candidate_options.dart';
 
 Future<CandidateReceipt?> _reusableCandidate(
   String receiptPath,
@@ -167,22 +108,6 @@ Future<void> _recordCandidateReceipt({
   }
 }
 
-CandidateReceipt _refreshCandidateReceipt(
-  CandidateReceipt receipt,
-  List<String> testflightGroups,
-) => CandidateReceipt(
-  version: receipt.version,
-  buildNumber: receipt.buildNumber,
-  buildId: receipt.buildId,
-  appId: receipt.appId,
-  bundleId: receipt.bundleId,
-  sourceSha: receipt.sourceSha,
-  sourceFingerprint: receipt.sourceFingerprint,
-  ipaSha256: receipt.ipaSha256,
-  uploadedAt: receipt.uploadedAt,
-  testflightGroups: testflightGroups,
-);
-
 Future<CandidateReceipt> createIosCandidate(CandidateOptions options) async {
   final root = p.normalize(p.absolute(options.root));
   await validateRepository(root);
@@ -200,7 +125,7 @@ Future<CandidateReceipt> createIosCandidate(CandidateOptions options) async {
   );
   invariant(
     await isClean(root),
-    'The candidate checkout must be clean before its source is fingerprinted.',
+    'The candidate checkout must be clean before repository hooks run.',
     'DIRTY_WORKTREE',
   );
   final state = manifest.ios;
@@ -208,6 +133,13 @@ Future<CandidateReceipt> createIosCandidate(CandidateOptions options) async {
     state.pendingRelease,
     'The iOS manifest does not contain a pending release.',
     'NO_PENDING_RELEASE',
+  );
+  await options.dependencies.runBeforeCandidate(root, config, state.version);
+  invariant(
+    await isClean(root),
+    'The before_candidate hook changed tracked or unignored files. Commit '
+        'deterministic candidate inputs before producing a build.',
+    'CANDIDATE_HOOK_DIRTY_WORKTREE',
   );
   final projectRoot = p.normalize(p.absolute(root, config.ios.projectPath));
   final bundleId = await options.dependencies.resolveBundleIdentifier(
@@ -229,9 +161,8 @@ Future<CandidateReceipt> createIosCandidate(CandidateOptions options) async {
       config: config.ios.testflight,
       client: client,
     );
-    final refreshed = _refreshCandidateReceipt(
-      reusable,
-      config.ios.testflight.groups,
+    final refreshed = reusable.copyWith(
+      testflightGroups: config.ios.testflight.groups,
     );
     await _recordCandidateReceipt(
       root: root,
@@ -244,19 +175,6 @@ Future<CandidateReceipt> createIosCandidate(CandidateOptions options) async {
     return refreshed;
   }
 
-  await options.dependencies.prepareDependencies(projectRoot);
-  invariant(
-    await isClean(root),
-    'Dependency resolution changed tracked or unignored repository files. '
-        'Commit a current lockfile before producing a candidate.',
-    'DEPENDENCIES_DIRTY_WORKTREE',
-  );
-  invariant(
-    await sourceFingerprint(root) == fingerprint,
-    'A tracked build input changed while validating dependencies.',
-    'DEPENDENCY_INPUT_CHANGED',
-  );
-
   final buildNumber = await client.nextBuildNumber(app.id, state.version);
   final sourceSha = await currentSha(root);
   final signing = await options.dependencies.installSigning(
@@ -267,11 +185,12 @@ Future<CandidateReceipt> createIosCandidate(CandidateOptions options) async {
   try {
     ipaPath = await options.dependencies.buildIpa(
       projectRoot: projectRoot,
+      command: config.ios.buildCommand,
+      artifactPath: config.ios.artifactPath,
       version: state.version,
       buildNumber: buildNumber,
       exportOptionsPath: signing.exportOptionsPath,
       scheme: config.ios.scheme,
-      buildArgs: config.ios.buildArgs,
     );
     invariant(
       await isClean(root),

@@ -25,3 +25,9 @@ All notable changes to ship-my-flutter-action are documented here.
   TestFlight/App Review workflows.
 - Read and validate the native repository context directly instead of bundling
   an otherwise unused GitHub API client.
+
+### Changed
+
+- Left Flutter/FVM installation to consumer workflows and preserved the
+  incoming project `PATH` for hooks and builds while running the vendored core
+  through an isolated pinned Dart SDK.

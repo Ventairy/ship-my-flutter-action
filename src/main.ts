@@ -68,6 +68,14 @@ function coreDirectory(): string {
   return path.join(actionPath, "vendor", "ship-my-flutter");
 }
 
+function coreDartExecutable(): string {
+  const value = process.env.SHIP_MY_FLUTTER_CORE_DART?.trim();
+  if (!value) {
+    throw new Error("The ship-my-flutter Dart toolchain is missing.");
+  }
+  return value;
+}
+
 function parseResult(stdout: string): JsonObject {
   let value: unknown;
   try {
@@ -212,9 +220,13 @@ export async function run(): Promise<void> {
   }
   const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const repositoryName = repository();
+  const executable = coreDartExecutable();
+  const environment = childEnvironment();
+  const consumerPath = process.env.SHIP_MY_FLUTTER_CONSUMER_PATH;
+  if (consumerPath) environment.PATH = consumerPath;
   core.info(`Running ${selected} for ${repositoryName}`);
   const result = await exec.getExecOutput(
-    "dart",
+    executable,
     [
       "run",
       "ship_my_flutter",
@@ -228,7 +240,7 @@ export async function run(): Promise<void> {
     ],
     {
       cwd: coreDirectory(),
-      env: childEnvironment(),
+      env: environment,
       silent: true,
       ignoreReturnCode: true,
     },

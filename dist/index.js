@@ -31280,6 +31280,13 @@ function coreDirectory() {
         external_node_path_default().resolve(external_node_path_default().dirname((0,external_node_url_.fileURLToPath)(import.meta.url)), "..");
     return external_node_path_default().join(actionPath, "vendor", "ship-my-flutter");
 }
+function coreDartExecutable() {
+    const value = process.env.SHIP_MY_FLUTTER_CORE_DART?.trim();
+    if (!value) {
+        throw new Error("The ship-my-flutter Dart toolchain is missing.");
+    }
+    return value;
+}
 function parseResult(stdout) {
     let value;
     try {
@@ -31390,8 +31397,13 @@ async function run() {
     }
     const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
     const repositoryName = repository();
+    const executable = coreDartExecutable();
+    const environment = childEnvironment();
+    const consumerPath = process.env.SHIP_MY_FLUTTER_CONSUMER_PATH;
+    if (consumerPath)
+        environment.PATH = consumerPath;
     info(`Running ${selected} for ${repositoryName}`);
-    const result = await getExecOutput("dart", [
+    const result = await getExecOutput(executable, [
         "run",
         "ship_my_flutter",
         "action",
@@ -31403,7 +31415,7 @@ async function run() {
         repositoryName,
     ], {
         cwd: coreDirectory(),
-        env: childEnvironment(),
+        env: environment,
         silent: true,
         ignoreReturnCode: true,
     });

@@ -18,6 +18,8 @@ beforeEach(() => {
   process.env.GITHUB_ACTION_PATH = "/action";
   process.env.GITHUB_REPOSITORY = "ventairy/example";
   process.env.INPUT_GITHUB_TOKEN = "token";
+  process.env.SHIP_MY_FLUTTER_CORE_DART = "/toolchains/dart-3.10/bin/dart";
+  process.env.SHIP_MY_FLUTTER_CONSUMER_PATH = "/project/flutter/bin:/usr/bin";
 });
 
 afterEach(() => {
@@ -45,7 +47,7 @@ describe("action adapter", () => {
     await run();
 
     expect(getExecOutput).toHaveBeenCalledWith(
-      "dart",
+      "/toolchains/dart-3.10/bin/dart",
       [
         "run",
         "ship_my_flutter",
@@ -59,6 +61,9 @@ describe("action adapter", () => {
       ],
       expect.objectContaining({
         cwd: "/action/vendor/ship-my-flutter",
+        env: expect.objectContaining({
+          PATH: "/project/flutter/bin:/usr/bin",
+        }),
         silent: true,
       }),
     );
@@ -303,6 +308,14 @@ describe("action adapter", () => {
     process.env.INPUT_GITHUB_TOKEN = " ";
 
     await expect(run()).rejects.toThrow("github-token is required");
+    expect(getExecOutput).not.toHaveBeenCalled();
+  });
+
+  it("requires the isolated Dart toolchain before launching the core", async () => {
+    process.env.INPUT_PHASE = "plan";
+    delete process.env.SHIP_MY_FLUTTER_CORE_DART;
+
+    await expect(run()).rejects.toThrow("Dart toolchain is missing");
     expect(getExecOutput).not.toHaveBeenCalled();
   });
 
