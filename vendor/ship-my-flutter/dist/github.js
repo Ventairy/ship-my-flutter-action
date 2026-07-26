@@ -57,12 +57,12 @@ export async function createOrUpdateReleasePullRequest(root, config, plan, conte
         throw new ShipError("The worktree must be clean before updating a release PR.", "DIRTY_WORKTREE");
     }
     const startingBranch = await currentBranch(root);
+    await configureBotIdentity(root);
     const branch = await ensureReleaseBranch(root, config, plan.platform);
     try {
         const refreshedPlan = { ...plan, headSha: plan.headSha };
         await applyReleasePlan(root, refreshedPlan);
         await runBeforeReleasePrHook(root, config, refreshedPlan);
-        await configureBotIdentity(root);
         await git(root, ["add", "."]);
         const staged = await git(root, ["diff", "--cached", "--name-only"]);
         if (staged) {
