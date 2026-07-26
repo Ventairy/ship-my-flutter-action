@@ -112,6 +112,10 @@ platforms:
     artifact_path: build/ios/ipa
 ```
 
+Both fields are optional. Without them, ship-my-flutter uses
+`flutter build ipa --release` and `build/ios/ipa`. Override them only for FVM,
+Melos, a custom wrapper, or a nonstandard artifact location.
+
 ship-my-flutter appends the planned version, next Apple build number, generated
 export-options plist, and configured flavor automatically.
 `build_command` must be one command invocation; put multi-step preparation,
