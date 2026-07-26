@@ -30,9 +30,14 @@ Run the initializer from the Flutter repository:
 ```bash
 dart pub add --dev ship_my_flutter
 dart run ship_my_flutter init \
-  --current-version 1.0.0 \
+  --current-version <current-ios-version> \
   --bundle-id com.example.myapp
 ```
+
+`--current-version` is the latest iOS marketing version already represented by
+the repository, not the next version you want to ship. For a never-released
+app, use `0.0.0` and add `Release-As-ios: 1.0.0` to the first qualifying
+Conventional Commit.
 
 The generated `.ship-my-flutter/config.yaml` includes a JSON Schema directive
 for editor validation and autocomplete. The initializer also writes the
