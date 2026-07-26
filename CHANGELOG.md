@@ -19,6 +19,8 @@ All notable changes to ship-my-flutter-action are documented here.
 
 ### Fixed
 
+- Updated the vendored core to reject compound build commands that could receive
+  automatically managed release arguments on the wrong shell command.
 - Reject malformed or incomplete Dart phase results instead of emitting
   plausible default Action outputs.
 - Document the App Store Connect roles required by upload-only and complete
