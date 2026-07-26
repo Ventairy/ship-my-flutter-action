@@ -1,6 +1,7 @@
 import path from "node:path";
 import { Octokit } from "@octokit/rest";
 import { AppStoreConnectClient } from "./client.js";
+import { resolveBundleId } from "./project.js";
 import { loadCandidateReceipt } from "../candidate-receipt.js";
 import { loadChangelog, loadConfig, loadManifest, loadStoreReleaseNotes, } from "../config.js";
 import { releaseNotesMarkdown } from "../changelog.js";
@@ -25,13 +26,18 @@ export async function promoteIosRelease(options) {
     const fingerprint = await sourceFingerprint(root);
     invariant(fingerprint === receipt.sourceFingerprint, "The merged source does not match the tested TestFlight candidate. Produce a new candidate before promoting this version.", "UNTESTED_SOURCE");
     const client = options.client ?? new AppStoreConnectClient(options.appleCredentials);
-    const build = await client.request("GET", `/v1/builds/${receipt.buildId}`);
-    invariant(build.data.attributes.processingState === "VALID" &&
-        build.data.attributes.version === receipt.buildNumber, "The recorded Apple build is no longer a valid candidate.", "CANDIDATE_INVALID");
+    const bundleId = await resolveBundleId(root, config.platforms.ios);
+    invariant(receipt.bundleId === bundleId, "The candidate receipt bundle identifier does not match the current iOS configuration.", "CANDIDATE_BUNDLE_MISMATCH");
+    const app = await client.findApp(bundleId);
+    invariant(receipt.appId === app.id, "The candidate receipt App Store app does not match the configured bundle identifier.", "CANDIDATE_APP_MISMATCH");
+    const versionBuilds = await client.buildsForVersion(app.id, state.version);
+    const build = versionBuilds.find((item) => item.id === receipt.buildId);
+    invariant(build?.attributes.processingState === "VALID" &&
+        build.attributes.version === receipt.buildNumber, "The recorded Apple build is not a valid build for the configured app and marketing version.", "CANDIDATE_INVALID");
     let appStoreVersionId;
     let reviewSubmissionId;
     if (config.platforms.ios.appStore.mode === "submit-for-review") {
-        const appStoreVersion = await client.findOrCreateAppStoreVersion(receipt.appId, state.version, config.platforms.ios.appStore.releaseType, config.platforms.ios.appStore.earliestReleaseDate);
+        const appStoreVersion = await client.findOrCreateAppStoreVersion(app.id, state.version, config.platforms.ios.appStore.releaseType, config.platforms.ios.appStore.earliestReleaseDate);
         appStoreVersionId = appStoreVersion.id;
         if (appStoreVersion.attributes.appStoreState === "PREPARE_FOR_SUBMISSION") {
             await client.attachBuildToVersion(appStoreVersion.id, receipt.buildId);
@@ -42,7 +48,7 @@ export async function promoteIosRelease(options) {
         }
         invariant((await client.appStoreVersionBuildId(appStoreVersion.id)) ===
             receipt.buildId, "The App Store version is not attached to the exact tested candidate build.", "APP_STORE_BUILD_MISMATCH");
-        reviewSubmissionId = await client.submitVersionForReview(receipt.appId, appStoreVersion.id);
+        reviewSubmissionId = await client.submitVersionForReview(app.id, appStoreVersion.id);
     }
     const changelog = await loadChangelog(root);
     const release = changelog.platforms.ios.releases[state.version];

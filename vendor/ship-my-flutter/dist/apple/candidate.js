@@ -7,7 +7,7 @@ import { loadCandidateReceipt } from "../candidate-receipt.js";
 import { loadConfig, loadManifest, loadStoreReleaseNotes } from "../config.js";
 import { ShipError, invariant } from "../errors.js";
 import { fileSha256, sourceFingerprint } from "../fingerprint.js";
-import { configureBotIdentity, currentBranch, currentSha, git, isClean, } from "../git.js";
+import { authenticatedGit, configureBotIdentity, currentBranch, currentSha, git, isClean, } from "../git.js";
 import { fileExists, writeJson } from "../json.js";
 import { candidatePath } from "../paths.js";
 import { validateRepository } from "../validate.js";
@@ -24,7 +24,7 @@ async function reusableCandidate(receiptPath, fingerprint, client) {
     }
     return undefined;
 }
-async function commitCandidateReceipt(root, receiptPath, version) {
+async function commitCandidateReceipt(root, receiptPath, version, github) {
     await configureBotIdentity(root);
     await git(root, ["add", receiptPath]);
     if (!(await git(root, ["diff", "--cached", "--name-only"])))
@@ -36,7 +36,12 @@ async function commitCandidateReceipt(root, receiptPath, version) {
     ]);
     const branch = await currentBranch(root);
     invariant(branch, "Candidate checkout must be on a branch.", "DETACHED_HEAD");
-    await git(root, ["push", "origin", branch]);
+    if (github) {
+        await authenticatedGit(root, ["push", "origin", branch], github.token);
+    }
+    else {
+        await git(root, ["push", "origin", branch]);
+    }
 }
 export async function createIosCandidate(options) {
     const root = path.resolve(options.root);
@@ -69,7 +74,7 @@ export async function createIosCandidate(options) {
         await writeJson(receiptPath, refreshed);
         if (options.commitReceipt ?? true) {
             try {
-                await commitCandidateReceipt(root, receiptPath, state.version);
+                await commitCandidateReceipt(root, receiptPath, state.version, options.github);
             }
             catch (error) {
                 throw new ShipError("The TestFlight build is valid, but its refreshed candidate receipt could not be committed. Do not merge the release PR until this is repaired.", "CANDIDATE_RECEIPT_COMMIT", { cause: error });
@@ -126,7 +131,7 @@ export async function createIosCandidate(options) {
     await writeJson(receiptPath, receipt);
     if (options.commitReceipt ?? true) {
         try {
-            await commitCandidateReceipt(root, receiptPath, state.version);
+            await commitCandidateReceipt(root, receiptPath, state.version, options.github);
         }
         catch (error) {
             throw new ShipError("The TestFlight build is valid, but its candidate receipt could not be committed. Do not merge the release PR until this is repaired.", "CANDIDATE_RECEIPT_COMMIT", { cause: error });

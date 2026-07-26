@@ -1,9 +1,10 @@
 import { AppStoreConnectClient } from "./client.js";
-import type { AppleCredentials, CandidateReceipt, SigningCredentials } from "../types.js";
+import type { AppleCredentials, CandidateReceipt, GitHubContext, SigningCredentials } from "../types.js";
 export interface CandidateOptions {
     root: string;
     appleCredentials: AppleCredentials;
     signingCredentials: SigningCredentials;
+    github?: GitHubContext;
     commitReceipt?: boolean;
     client?: AppStoreConnectClient;
 }

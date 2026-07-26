@@ -5,6 +5,11 @@ export interface GitCommit {
 export declare function git(root: string, args: string[], options?: {
     silent?: boolean;
     allowFailure?: boolean;
+    env?: NodeJS.ProcessEnv;
+}): Promise<string>;
+export declare function authenticatedGit(root: string, args: string[], token: string, options?: {
+    silent?: boolean;
+    allowFailure?: boolean;
 }): Promise<string>;
 export declare function currentSha(root: string): Promise<string>;
 export declare function currentBranch(root: string): Promise<string>;

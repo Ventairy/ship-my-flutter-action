@@ -2,6 +2,15 @@
 
 The official GitHub Action for [ship-my-flutter](https://github.com/Ventairy/ship-my-flutter).
 
+> [!WARNING]
+> This action is in pre-release validation and has no `v1` tag yet. The public
+> integration fixture is pinned to an exact tested commit; production `@v1`
+> publication remains tracked in
+> [action issue #1](https://github.com/Ventairy/ship-my-flutter-action/issues/1)
+> after the live Apple acceptance gate. Examples below describe the intended
+> stable interface. Non-Apple action behavior is exercised publicly in
+> [`Ventairy/ship-my-flutter-e2e`](https://github.com/Ventairy/ship-my-flutter-e2e).
+
 It exposes the full release lifecycle through one action:
 
 - `plan` opens or updates the platform release PR;
@@ -53,7 +62,7 @@ It writes the complete multi-job workflow. The essential action steps are:
 | Input                                  | Phase             | Required      | Purpose                                             |
 | -------------------------------------- | ----------------- | ------------- | --------------------------------------------------- |
 | `phase`                                | all               | yes           | `plan`, `candidate`, or `promote`                   |
-| `github-token`                         | plan/promote      | default token | Maintains PRs, receipts, labels, tags, and releases |
+| `github-token`                         | all               | default token | Maintains PRs, receipts, labels, tags, and releases |
 | `flutter-channel`                      | candidate         | no            | Flutter channel; defaults to `stable`               |
 | `flutter-version`                      | candidate         | no            | Exact Flutter version/expression                    |
 | `flutter-version-file`                 | candidate         | auto-detected | Explicit `pubspec.yaml`, `.fvmrc`, or FVM config    |
@@ -84,8 +93,17 @@ The repository or organization must also allow GitHub Actions to create pull
 requests. Enable **Settings → Actions → General → Workflow permissions → Allow
 GitHub Actions to create and approve pull requests**. If organization policy
 locks that option off, pass an allowed GitHub App installation token or
-fine-grained personal access token to `github-token`; Pull requests and Issues
-read/write access is sufficient for the plan API calls.
+fine-grained personal access token to `github-token`; grant Contents, Pull
+requests, and Issues read/write access.
+
+Generated checkouts use `persist-credentials: false`. The action exposes its
+token only to the individual authenticated Git operation that needs it, so
+Flutter builds and repository hooks cannot reuse a checkout credential.
+
+Do not merge the release PR until the candidate job has committed its receipt
+and the exact TestFlight build has been tested. The initializer defaults App
+Store behavior to `upload-only`; submission for review is an explicit
+configuration opt-in.
 
 ## Development
 

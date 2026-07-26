@@ -42,7 +42,7 @@ export async function initialize(options) {
                     waitTimeoutMinutes: 45,
                 },
                 appStore: {
-                    mode: "submit-for-review",
+                    mode: "upload-only",
                     releaseType: "manual",
                 },
             },

@@ -72830,7 +72830,7 @@ const configSchema = object({
                 .default({ groups: [], waitTimeoutMinutes: 45 }),
             appStore: object({
                 mode: schemas_enum(["submit-for-review", "upload-only"])
-                    .default("submit-for-review"),
+                    .default("upload-only"),
                 releaseType: schemas_enum(["manual", "automatic", "scheduled"])
                     .default("manual"),
                 earliestReleaseDate: schemas_string().datetime().optional(),
@@ -72854,7 +72854,7 @@ const configSchema = object({
                 }
             })
                 .default({
-                mode: "submit-for-review",
+                mode: "upload-only",
                 releaseType: "manual",
             }),
         }),
@@ -72955,11 +72955,23 @@ async function git(root, args, options = {}) {
     const result = await run("git", args, {
         cwd: root,
         silent: options.silent ?? true,
+        ...(options.env === undefined ? {} : { env: options.env }),
         ...(options.allowFailure === undefined
             ? {}
             : { allowFailure: options.allowFailure }),
     });
     return result.stdout.trim();
+}
+async function authenticatedGit(root, args, token, options = {}) {
+    const authorization = Buffer.from(`x-access-token:${token}`).toString("base64");
+    return git(root, args, {
+        ...options,
+        env: {
+            GIT_CONFIG_COUNT: "1",
+            GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
+            GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${authorization}`,
+        },
+    });
 }
 async function git_currentSha(root) {
     return git(root, ["rev-parse", "HEAD"]);
@@ -73163,7 +73175,7 @@ async function reusableCandidate(receiptPath, fingerprint, client) {
     }
     return undefined;
 }
-async function commitCandidateReceipt(root, receiptPath, version) {
+async function commitCandidateReceipt(root, receiptPath, version, github) {
     await configureBotIdentity(root);
     await git(root, ["add", receiptPath]);
     if (!(await git(root, ["diff", "--cached", "--name-only"])))
@@ -73175,7 +73187,12 @@ async function commitCandidateReceipt(root, receiptPath, version) {
     ]);
     const branch = await currentBranch(root);
     errors_invariant(branch, "Candidate checkout must be on a branch.", "DETACHED_HEAD");
-    await git(root, ["push", "origin", branch]);
+    if (github) {
+        await authenticatedGit(root, ["push", "origin", branch], github.token);
+    }
+    else {
+        await git(root, ["push", "origin", branch]);
+    }
 }
 async function createIosCandidate(options) {
     const root = external_node_path_namespaceObject.resolve(options.root);
@@ -73208,7 +73225,7 @@ async function createIosCandidate(options) {
         await json_writeJson(receiptPath, refreshed);
         if (options.commitReceipt ?? true) {
             try {
-                await commitCandidateReceipt(root, receiptPath, state.version);
+                await commitCandidateReceipt(root, receiptPath, state.version, options.github);
             }
             catch (error) {
                 throw new errors_ShipError("The TestFlight build is valid, but its refreshed candidate receipt could not be committed. Do not merge the release PR until this is repaired.", "CANDIDATE_RECEIPT_COMMIT", { cause: error });
@@ -73265,7 +73282,7 @@ async function createIosCandidate(options) {
     await json_writeJson(receiptPath, receipt);
     if (options.commitReceipt ?? true) {
         try {
-            await commitCandidateReceipt(root, receiptPath, state.version);
+            await commitCandidateReceipt(root, receiptPath, state.version, options.github);
         }
         catch (error) {
             throw new errors_ShipError("The TestFlight build is valid, but its candidate receipt could not be committed. Do not merge the release PR until this is repaired.", "CANDIDATE_RECEIPT_COMMIT", { cause: error });
@@ -74042,6 +74059,7 @@ async function createReleasePlan(root, manifest, platform) {
 
 
 
+
 async function promoteIosRelease(options) {
     const root = external_node_path_namespaceObject.resolve(options.root);
     await validateRepository(root);
@@ -74057,13 +74075,18 @@ async function promoteIosRelease(options) {
     const fingerprint = await sourceFingerprint(root);
     errors_invariant(fingerprint === receipt.sourceFingerprint, "The merged source does not match the tested TestFlight candidate. Produce a new candidate before promoting this version.", "UNTESTED_SOURCE");
     const client = options.client ?? new AppStoreConnectClient(options.appleCredentials);
-    const build = await client.request("GET", `/v1/builds/${receipt.buildId}`);
-    errors_invariant(build.data.attributes.processingState === "VALID" &&
-        build.data.attributes.version === receipt.buildNumber, "The recorded Apple build is no longer a valid candidate.", "CANDIDATE_INVALID");
+    const bundleId = await resolveBundleId(root, config.platforms.ios);
+    errors_invariant(receipt.bundleId === bundleId, "The candidate receipt bundle identifier does not match the current iOS configuration.", "CANDIDATE_BUNDLE_MISMATCH");
+    const app = await client.findApp(bundleId);
+    errors_invariant(receipt.appId === app.id, "The candidate receipt App Store app does not match the configured bundle identifier.", "CANDIDATE_APP_MISMATCH");
+    const versionBuilds = await client.buildsForVersion(app.id, state.version);
+    const build = versionBuilds.find((item) => item.id === receipt.buildId);
+    errors_invariant(build?.attributes.processingState === "VALID" &&
+        build.attributes.version === receipt.buildNumber, "The recorded Apple build is not a valid build for the configured app and marketing version.", "CANDIDATE_INVALID");
     let appStoreVersionId;
     let reviewSubmissionId;
     if (config.platforms.ios.appStore.mode === "submit-for-review") {
-        const appStoreVersion = await client.findOrCreateAppStoreVersion(receipt.appId, state.version, config.platforms.ios.appStore.releaseType, config.platforms.ios.appStore.earliestReleaseDate);
+        const appStoreVersion = await client.findOrCreateAppStoreVersion(app.id, state.version, config.platforms.ios.appStore.releaseType, config.platforms.ios.appStore.earliestReleaseDate);
         appStoreVersionId = appStoreVersion.id;
         if (appStoreVersion.attributes.appStoreState === "PREPARE_FOR_SUBMISSION") {
             await client.attachBuildToVersion(appStoreVersion.id, receipt.buildId);
@@ -74074,7 +74097,7 @@ async function promoteIosRelease(options) {
         }
         errors_invariant((await client.appStoreVersionBuildId(appStoreVersion.id)) ===
             receipt.buildId, "The App Store version is not attached to the exact tested candidate build.", "APP_STORE_BUILD_MISMATCH");
-        reviewSubmissionId = await client.submitVersionForReview(receipt.appId, appStoreVersion.id);
+        reviewSubmissionId = await client.submitVersionForReview(app.id, appStoreVersion.id);
     }
     const changelog = await loadChangelog(root);
     const release = changelog.platforms.ios.releases[state.version];
@@ -74230,7 +74253,7 @@ async function initialize(options) {
                     waitTimeoutMinutes: 45,
                 },
                 appStore: {
-                    mode: "submit-for-review",
+                    mode: "upload-only",
                     releaseType: "manual",
                 },
             },
@@ -74301,9 +74324,9 @@ async function runBeforeReleasePrHook(root, config, plan) {
 function branchName(config, platform) {
     return `${config.releaseBranchPrefix}/${platform}`;
 }
-async function ensureReleaseBranch(root, config, platform) {
+async function ensureReleaseBranch(root, config, platform, token) {
     const branch = branchName(config, platform);
-    await git(root, ["fetch", "origin", config.targetBranch, branch], {
+    await authenticatedGit(root, ["fetch", "origin", config.targetBranch, branch], token, {
         allowFailure: true,
     });
     const remoteBranch = await git(root, ["rev-parse", "--verify", "--quiet", `origin/${branch}`], { allowFailure: true });
@@ -74351,7 +74374,7 @@ async function createOrUpdateReleasePullRequest(root, config, plan, context, oct
     }
     const startingBranch = await currentBranch(root);
     await configureBotIdentity(root);
-    const branch = await ensureReleaseBranch(root, config, plan.platform);
+    const branch = await ensureReleaseBranch(root, config, plan.platform, context.token);
     try {
         const refreshedPlan = { ...plan, headSha: plan.headSha };
         await applyReleasePlan(root, refreshedPlan);
@@ -74365,7 +74388,7 @@ async function createOrUpdateReleasePullRequest(root, config, plan, context, oct
                 `chore(${plan.platform}): release ${plan.nextVersion}`,
             ]);
         }
-        await git(root, ["push", "--set-upstream", "origin", branch]);
+        await authenticatedGit(root, ["push", "--set-upstream", "origin", branch], context.token);
         const changelog = await loadChangelog(root);
         const release = changelog.platforms[plan.platform].releases[plan.nextVersion];
         if (!release) {
@@ -74559,11 +74582,13 @@ async function main_run() {
         }
         const appleCredentials = appleCredentialsFromEnvironment();
         const signingCredentials = signingCredentialsFromEnvironment();
+        const githubApi = githubContext();
         clearSensitiveInputs();
         const receipt = await createIosCandidate({
             root: repositoryRoot,
             appleCredentials,
             signingCredentials,
+            github: githubApi,
         });
         setOutput("phase", "candidate");
         setOutput("platform", receipt.platform);

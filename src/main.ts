@@ -87,11 +87,13 @@ export async function run(): Promise<void> {
     }
     const appleCredentials = appleCredentialsFromEnvironment();
     const signingCredentials = signingCredentialsFromEnvironment();
+    const githubApi = githubContext();
     clearSensitiveInputs();
     const receipt = await createIosCandidate({
       root: repositoryRoot,
       appleCredentials,
       signingCredentials,
+      github: githubApi,
     });
     core.setOutput("phase", "candidate");
     core.setOutput("platform", receipt.platform);

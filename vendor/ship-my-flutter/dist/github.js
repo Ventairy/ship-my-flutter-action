@@ -1,16 +1,16 @@
 import { Octokit } from "@octokit/rest";
 import { loadChangelog } from "./config.js";
 import { ShipError } from "./errors.js";
-import { configureBotIdentity, currentBranch, git, isClean } from "./git.js";
+import { authenticatedGit, configureBotIdentity, currentBranch, git, isClean, } from "./git.js";
 import { runBeforeReleasePrHook } from "./hooks.js";
 import { applyReleasePlan } from "./manifest-files.js";
 import { releasePullRequestBody } from "./changelog.js";
 function branchName(config, platform) {
     return `${config.releaseBranchPrefix}/${platform}`;
 }
-async function ensureReleaseBranch(root, config, platform) {
+async function ensureReleaseBranch(root, config, platform, token) {
     const branch = branchName(config, platform);
-    await git(root, ["fetch", "origin", config.targetBranch, branch], {
+    await authenticatedGit(root, ["fetch", "origin", config.targetBranch, branch], token, {
         allowFailure: true,
     });
     const remoteBranch = await git(root, ["rev-parse", "--verify", "--quiet", `origin/${branch}`], { allowFailure: true });
@@ -58,7 +58,7 @@ export async function createOrUpdateReleasePullRequest(root, config, plan, conte
     }
     const startingBranch = await currentBranch(root);
     await configureBotIdentity(root);
-    const branch = await ensureReleaseBranch(root, config, plan.platform);
+    const branch = await ensureReleaseBranch(root, config, plan.platform, context.token);
     try {
         const refreshedPlan = { ...plan, headSha: plan.headSha };
         await applyReleasePlan(root, refreshedPlan);
@@ -72,7 +72,7 @@ export async function createOrUpdateReleasePullRequest(root, config, plan, conte
                 `chore(${plan.platform}): release ${plan.nextVersion}`,
             ]);
         }
-        await git(root, ["push", "--set-upstream", "origin", branch]);
+        await authenticatedGit(root, ["push", "--set-upstream", "origin", branch], context.token);
         const changelog = await loadChangelog(root);
         const release = changelog.platforms[plan.platform].releases[plan.nextVersion];
         if (!release) {

@@ -6,11 +6,23 @@ export async function git(root, args, options = {}) {
     const result = await run("git", args, {
         cwd: root,
         silent: options.silent ?? true,
+        ...(options.env === undefined ? {} : { env: options.env }),
         ...(options.allowFailure === undefined
             ? {}
             : { allowFailure: options.allowFailure }),
     });
     return result.stdout.trim();
+}
+export async function authenticatedGit(root, args, token, options = {}) {
+    const authorization = Buffer.from(`x-access-token:${token}`).toString("base64");
+    return git(root, args, {
+        ...options,
+        env: {
+            GIT_CONFIG_COUNT: "1",
+            GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
+            GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${authorization}`,
+        },
+    });
 }
 export async function currentSha(root) {
     return git(root, ["rev-parse", "HEAD"]);
