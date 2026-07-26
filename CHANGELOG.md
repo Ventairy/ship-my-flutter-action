@@ -14,6 +14,8 @@ All notable changes to ship-my-flutter-action are documented here.
   dependency-age safeguards, and enforced coverage thresholds.
 - Pull-request dependency review for newly introduced high-severity
   vulnerabilities.
+- Release Please automation for semantic releases and synchronized major/minor
+  Action tags.
 
 ### Fixed
 

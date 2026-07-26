@@ -163,4 +163,6 @@ dart pub get --enforce-lockfile -C vendor/ship-my-flutter
 pnpm run check
 ```
 
-Review both generated diffs before release. See the core [release procedure](https://github.com/Ventairy/ship-my-flutter/blob/main/RELEASING.md).
+Review both generated diffs before release. Follow this repository's
+[Action release procedure](RELEASING.md) and the core
+[release procedure](https://github.com/Ventairy/ship-my-flutter/blob/main/RELEASING.md).
