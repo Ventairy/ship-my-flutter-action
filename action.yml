@@ -1,0 +1,128 @@
+name: Ship my Flutter
+description: Open Flutter release PRs, publish TestFlight candidates, and promote the exact tested iOS build.
+author: Ventairy
+
+branding:
+  icon: upload-cloud
+  color: blue
+
+inputs:
+  phase:
+    description: "Workflow phase: plan, candidate, or promote."
+    required: true
+  github-token:
+    description: GitHub token used for release PRs, receipts, labels, and releases.
+    required: false
+    default: ${{ github.token }}
+  flutter-channel:
+    description: Flutter channel used for candidate builds.
+    required: false
+    default: stable
+  flutter-version:
+    description: Exact Flutter version or version expression used for candidate builds.
+    required: false
+    default: ""
+  flutter-version-file:
+    description: pubspec.yaml, .fvmrc, or fvm_config.json containing the Flutter version.
+    required: false
+    default: ""
+  app-store-connect-key-id:
+    description: App Store Connect API key ID.
+    required: false
+  app-store-connect-issuer-id:
+    description: App Store Connect API issuer ID.
+    required: false
+  app-store-connect-private-key-base64:
+    description: Base64-encoded App Store Connect .p8 private key.
+    required: false
+  ios-certificate-base64:
+    description: Base64-encoded Apple Distribution .p12 certificate.
+    required: false
+  ios-certificate-password:
+    description: Password for the Apple Distribution .p12 certificate.
+    required: false
+  ios-provisioning-profiles-base64:
+    description: A Base64 profile or JSON object mapping bundle IDs to Base64 App Store profiles.
+    required: false
+
+outputs:
+  phase:
+    description: "Next phase: noop, candidate, or promote."
+    value: ${{ steps.run.outputs.phase }}
+  platform:
+    description: Platform being released.
+    value: ${{ steps.run.outputs.platform }}
+  version:
+    description: Planned or promoted platform version.
+    value: ${{ steps.run.outputs.version }}
+  branch:
+    description: Release PR branch for a candidate checkout.
+    value: ${{ steps.run.outputs.branch }}
+  pull-request-number:
+    description: Release pull request number.
+    value: ${{ steps.run.outputs.pull-request-number }}
+  build-id:
+    description: App Store Connect build resource ID.
+    value: ${{ steps.run.outputs.build-id }}
+  build-number:
+    description: Apple build number.
+    value: ${{ steps.run.outputs.build-number }}
+  release-url:
+    description: GitHub Release URL.
+    value: ${{ steps.run.outputs.release-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Flutter version
+      id: flutter-config
+      if: inputs.phase == 'candidate'
+      shell: bash
+      env:
+        EXPLICIT_FLUTTER_VERSION: ${{ inputs.flutter-version }}
+        EXPLICIT_FLUTTER_VERSION_FILE: ${{ inputs.flutter-version-file }}
+      run: |
+        if [[ -n "$EXPLICIT_FLUTTER_VERSION" && -n "$EXPLICIT_FLUTTER_VERSION_FILE" ]]; then
+          echo "Set flutter-version or flutter-version-file, not both." >&2
+          exit 1
+        fi
+
+        version_file="$EXPLICIT_FLUTTER_VERSION_FILE"
+        if [[ -z "$EXPLICIT_FLUTTER_VERSION" && -z "$version_file" ]]; then
+          for candidate in .fvmrc .fvm/fvm_config.json fvm_config.json; do
+            if [[ -f "$candidate" ]]; then
+              version_file="$candidate"
+              break
+            fi
+          done
+        fi
+
+        if [[ "$version_file" == *$'\n'* || "$version_file" == *$'\r'* ]]; then
+          echo "flutter-version-file cannot contain a newline." >&2
+          exit 1
+        fi
+        printf 'version-file=%s\n' "$version_file" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Flutter
+      if: inputs.phase == 'candidate'
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      with:
+        channel: ${{ inputs.flutter-channel }}
+        flutter-version: ${{ inputs.flutter-version }}
+        flutter-version-file: ${{ steps.flutter-config.outputs.version-file }}
+        cache: "true"
+        pub-cache: "true"
+
+    - name: Ship my Flutter
+      id: run
+      shell: bash
+      env:
+        INPUT_PHASE: ${{ inputs.phase }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
+        SMF_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
+        SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}
+        SMF_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
+        SMF_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
+        SMF_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
+      run: node "$GITHUB_ACTION_PATH/dist/index.js"

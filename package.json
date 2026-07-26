@@ -1,0 +1,46 @@
+{
+  "name": "ship-my-flutter-action",
+  "version": "0.1.0",
+  "description": "The official GitHub Action for ship-my-flutter.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && ncc build src/main.ts -o dist --license licenses.txt",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "vendor-core": "npm --prefix ../ship-my-flutter run build && node scripts/vendor-core.mjs"
+  },
+  "keywords": [
+    "github-action",
+    "flutter",
+    "testflight",
+    "app-store",
+    "release"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ventairy/ship-my-flutter-action.git"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@actions/github": "9.1.1",
+    "ship-my-flutter": "file:vendor/ship-my-flutter"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@vercel/ncc": "0.44.1",
+    "eslint": "10.8.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  }
+}
