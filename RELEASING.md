@@ -2,7 +2,7 @@
 
 Release Please owns `package.json` versions, `CHANGELOG.md`, immutable semantic
 version tags, and GitHub Releases. The Action is not published to npm; users
-consume the committed `action.yml`, `dist`, and vendored Dart core from a Git
+consume the committed `action.yml`, `dist`, and vendored SMF Dart workspace from a Git
 ref.
 
 ## Release credential
@@ -28,7 +28,7 @@ revocation as repository administration.
 
 1. Use Conventional Commits on `main`.
 2. CI validates Node 20, 22, and 24, the Dart adapter, the bundled `dist`,
-   dependency audits, and vendored-core provenance.
+   dependency audits, and vendored-workspace provenance.
 3. After CI succeeds, Release Please opens or updates its release PR and
    dispatches the same CI workflow on that PR branch.
 4. Review the proposed version, changelog, `package.json`, and manifest.

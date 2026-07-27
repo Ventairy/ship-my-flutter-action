@@ -7,7 +7,7 @@ import { afterEach, expect, it } from "vitest";
 
 const exec = promisify(execFile);
 const actionRoot = path.resolve(import.meta.dirname, "..");
-const coreRoot = path.join(actionRoot, "vendor", "smf");
+const runtimeRoot = path.join(actionRoot, "vendor", "smf");
 const originalEnvironment = { ...process.env };
 
 async function dartExecutable(): Promise<string> {
@@ -58,8 +58,8 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     await exec(
       dart,
       [
-        "run",
-        path.join(coreRoot, "bin", "init.dart"),
+        path.join(runtimeRoot, "packages", "smf_cli", "bin", "smf.dart"),
+        "init",
         "--bundle-id",
         "dev.example.app",
       ],
@@ -79,7 +79,7 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     process.env.INPUT_GITHUB_TOKEN = "not-a-real-token";
     process.env.INPUT_PHASE = "pull-request";
     process.env.PATH = `${path.dirname(dart)}${path.delimiter}${process.env.PATH ?? ""}`;
-    process.env.SMF_CORE_DART = dart;
+    process.env.SMF_DART = dart;
     process.env.SMF_CONSUMER_PATH = process.env.PATH;
     const { run } = await import("../src/main.js");
     await run();

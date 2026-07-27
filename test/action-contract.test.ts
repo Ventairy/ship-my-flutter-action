@@ -13,12 +13,12 @@ describe("composite action contract", () => {
     expect(action).not.toContain("flutter-version-file:");
   });
 
-  it("isolates the core Dart SDK from the consumer toolchain", async () => {
+  it("isolates the SMF Dart SDK from the consumer toolchain", async () => {
     const action = await fs.readFile(actionPath, "utf8");
 
     expect(action).toContain("Preserve consumer toolchain");
     expect(action).toContain("dart-lang/setup-dart@");
-    expect(action).toContain("SMF_CORE_DART:");
+    expect(action).toContain("SMF_DART:");
     expect(action).toContain("SMF_CONSUMER_PATH:");
   });
 

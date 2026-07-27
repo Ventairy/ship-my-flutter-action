@@ -47,31 +47,33 @@ jobs:
       - if: matrix.node == 20
         run: pnpm run audit
       - run: git diff --exit-code -- dist
-      - id: core
+      - id: smf
         if: matrix.node == 20
-        name: Read vendored core provenance
+        name: Read vendored SMF provenance
         shell: bash
         run: |
-          core_commit="$(tr -d '\r\n' < vendor/smf/CORE_COMMIT)"
-          if [[ ! "$core_commit" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "CORE_COMMIT must contain one full lowercase Git SHA." >&2
+          smf_commit="$(tr -d '\r\n' < vendor/smf/SMF_COMMIT)"
+          if [[ ! "$smf_commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "SMF_COMMIT must contain one full lowercase Git SHA." >&2
             exit 1
           fi
-          printf 'commit=%s\n' "$core_commit" >> "$GITHUB_OUTPUT"
+          printf 'commit=%s\n' "$smf_commit" >> "$GITHUB_OUTPUT"
       - if: matrix.node == 20
-        name: Check out recorded core
+        name: Check out recorded SMF workspace
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: Ventairy/smf
-          ref: ${{ steps.core.outputs.commit }}
-          path: upstream-core
+          ref: ${{ steps.smf.outputs.commit }}
+          path: upstream-smf
           persist-credentials: false
       - if: matrix.node == 20
-        name: Verify vendored core provenance
+        name: Verify vendored SMF provenance
         shell: bash
         run: |
-          diff -ru upstream-core/bin vendor/smf/bin
-          diff -ru upstream-core/lib vendor/smf/lib
-          cmp upstream-core/pubspec.yaml vendor/smf/pubspec.yaml
-          cmp upstream-core/LICENSE vendor/smf/LICENSE
-          cmp upstream-core/NOTICE vendor/smf/NOTICE
+          for package in smf_hooks smf_engine smf_apple smf_cli; do
+            diff -ru "upstream-smf/packages/$package/lib" "vendor/smf/packages/$package/lib"
+            cmp "upstream-smf/packages/$package/pubspec.yaml" "vendor/smf/packages/$package/pubspec.yaml"
+            cmp "upstream-smf/packages/$package/LICENSE" "vendor/smf/packages/$package/LICENSE"
+            cmp "upstream-smf/packages/$package/NOTICE" "vendor/smf/packages/$package/NOTICE"
+          done
+          diff -ru upstream-smf/packages/smf_cli/bin vendor/smf/packages/smf_cli/bin

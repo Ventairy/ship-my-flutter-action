@@ -18,7 +18,7 @@ beforeEach(() => {
   process.env.GITHUB_ACTION_PATH = "/action";
   process.env.GITHUB_REPOSITORY = "ventairy/example";
   process.env.INPUT_GITHUB_TOKEN = "token";
-  process.env.SMF_CORE_DART = "/toolchains/dart-3.10/bin/dart";
+  process.env.SMF_DART = "/toolchains/dart-3.10/bin/dart";
   process.env.SMF_CONSUMER_PATH = "/project/flutter/bin:/usr/bin";
 });
 
@@ -50,7 +50,8 @@ describe("action adapter", () => {
       "/toolchains/dart-3.10/bin/dart",
       [
         "run",
-        "smf:action",
+        "smf_cli:smf",
+        "action",
         "--phase",
         "pull-request",
         "--working-directory",
@@ -330,9 +331,9 @@ describe("action adapter", () => {
     expect(getExecOutput).not.toHaveBeenCalled();
   });
 
-  it("requires the isolated Dart toolchain before launching the core", async () => {
+  it("requires the isolated Dart toolchain before launching SMF", async () => {
     process.env.INPUT_PHASE = "pull-request";
-    delete process.env.SMF_CORE_DART;
+    delete process.env.SMF_DART;
 
     await expect(run()).rejects.toThrow("Dart toolchain is missing");
     expect(getExecOutput).not.toHaveBeenCalled();

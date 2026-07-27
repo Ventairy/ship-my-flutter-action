@@ -20,8 +20,8 @@ It exposes the full release lifecycle through one action:
 - `ship` verifies that recorded build after merge, optionally submits it
   when configured, and completes the platform GitHub Release.
 
-The Action vendors the exact Dart core source and owns a generated deployment
-lockfile for it. It installs its own pinned Dart SDK and enforces that lockfile
+The Action vendors the exact SMF Dart workspace source and owns a generated
+deployment lockfile for it. It installs its own pinned Dart SDK and enforces that lockfile
 automatically, so consumer repositories do not install Node packages or
 Fastlane. It does not install the app's Flutter or FVM toolchain.
 
@@ -30,8 +30,8 @@ Fastlane. It does not install the app's Flutter or FVM toolchain.
 Run the initializer from the Flutter app directory:
 
 ```bash
-dart pub add --dev smf
-dart run smf:init \
+dart install smf_cli
+smf init \
   --current-version <current-ios-version> \
   --bundle-id com.example.myapp
 ```
@@ -174,32 +174,33 @@ configuration opt-in.
 The Action is deliberately hybrid:
 
 - Dart owns release planning, GitHub operations, signing, TestFlight, App Store
-  Connect, the project-local package executables, and the reusable library API.
+  Connect, the installed CLI, and the reusable library APIs.
 - TypeScript only reads native Action inputs/context, masks secrets, launches
   Dart, maps failures, and writes outputs.
 
 The Action captures the consumer's incoming `PATH` before installing its pinned
-Dart SDK. The core runs through the isolated Dart executable, while repository
+Dart SDK. SMF runs through the isolated Dart executable, while repository
 hooks and `build_command` inherit the original project toolchain path. This
 prevents the Action's Dart from replacing the Dart bundled with the project's
 Flutter SDK.
 
 The repository checks in two generated artifacts:
 
-- `vendor/smf`: exact Dart package source, Action-owned deployment
-  lockfile, and `CORE_COMMIT` provenance record;
+- `vendor/smf`: exact Dart workspace source, Action-owned deployment
+  lockfile, and `SMF_COMMIT` provenance record;
 - `dist`: bundled thin TypeScript Action adapter.
 
-Hosted CI checks out the recorded public core commit and compares every
+Hosted CI checks out the recorded public SMF commit and compares every
 vendored source/package file byte-for-byte. The Action-owned
 `pubspec.lock` is verified separately with `--enforce-lockfile`.
 
-After a core change, start from a clean adjacent core checkout. Run
-`vendor-core` with Dart 3.10 so it copies the source, records its commit, and
+After an SMF change, start from a clean adjacent SMF checkout. Run
+`vendor-smf` with Dart 3.10 so it copies the runtime packages, records the
+workspace commit, and
 generates the Action's deployment lockfile:
 
 ```bash
-pnpm run vendor-core
+pnpm run vendor-smf
 pnpm install --frozen-lockfile
 pnpm run format
 dart pub get --enforce-lockfile -C vendor/smf
@@ -207,5 +208,5 @@ pnpm run check
 ```
 
 Review both generated diffs before release. Follow this repository's
-[Action release procedure](RELEASING.md) and the core
+[Action release procedure](RELEASING.md) and the SMF workspace
 [release procedure](https://github.com/Ventairy/smf/blob/main/RELEASING.md).

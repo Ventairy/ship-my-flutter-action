@@ -31281,13 +31281,13 @@ function childEnvironment() {
     }
     return environment;
 }
-function coreDirectory() {
+function runtimeDirectory() {
     const actionPath = process.env.GITHUB_ACTION_PATH ??
         external_node_path_default().resolve(external_node_path_default().dirname((0,external_node_url_.fileURLToPath)(import.meta.url)), "..");
     return external_node_path_default().join(actionPath, "vendor", "smf");
 }
-function coreDartExecutable() {
-    const value = process.env.SMF_CORE_DART?.trim();
+function dartExecutable() {
+    const value = process.env.SMF_DART?.trim();
     if (!value) {
         throw new Error("The smf Dart toolchain is missing.");
     }
@@ -31404,7 +31404,7 @@ async function run() {
     const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
     const repositoryName = repository();
     const selectedSmfPath = smfPath();
-    const executable = coreDartExecutable();
+    const executable = dartExecutable();
     const environment = childEnvironment();
     const consumerPath = process.env.SMF_CONSUMER_PATH;
     if (consumerPath)
@@ -31412,7 +31412,8 @@ async function run() {
     info(`Running ${selected} for ${repositoryName}`);
     const arguments_ = [
         "run",
-        "smf:action",
+        "smf_cli:smf",
+        "action",
         "--phase",
         selected,
         "--working-directory",
@@ -31424,7 +31425,7 @@ async function run() {
         arguments_.push("--smf-path", selectedSmfPath);
     }
     const result = await getExecOutput(executable, arguments_, {
-        cwd: coreDirectory(),
+        cwd: runtimeDirectory(),
         env: environment,
         silent: true,
         ignoreReturnCode: true,

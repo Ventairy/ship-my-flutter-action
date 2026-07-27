@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "vendor-core": "node scripts/vendor-core.mjs"
+    "vendor-smf": "node scripts/vendor-smf.mjs"
   },
   "keywords": [
     "github-action",

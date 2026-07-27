@@ -80,8 +80,8 @@ runs:
       with:
         sdk: 3.10.0
 
-    - name: Resolve core toolchain
-      id: core-toolchain
+    - name: Resolve SMF toolchain
+      id: smf-toolchain
       shell: bash
       run: |
         dart_path="$(command -v dart)"
@@ -94,8 +94,8 @@ runs:
     - name: Resolve smf dependencies
       shell: bash
       env:
-        CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
-      run: '"$CORE_DART" pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/smf"'
+        SMF_DART: ${{ steps.smf-toolchain.outputs.dart }}
+      run: '"$SMF_DART" pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/smf"'
 
     - name: SMF
       id: run
@@ -104,7 +104,7 @@ runs:
         INPUT_PHASE: ${{ inputs.phase }}
         INPUT_SMF_PATH: ${{ inputs.smf-path }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
-        SMF_CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
+        SMF_DART: ${{ steps.smf-toolchain.outputs.dart }}
         SMF_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
         SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
         SMF_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
