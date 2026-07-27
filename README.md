@@ -20,12 +20,23 @@ It exposes the full release lifecycle through one action:
 - `ship` verifies that recorded build after merge, optionally submits it
   when configured, and completes the platform GitHub Release.
 
-The Action vendors the exact SMF Dart workspace source and owns a generated
-deployment lockfile for it. It installs its own pinned Dart SDK and enforces that lockfile
-automatically, so consumer repositories do not install Node packages or
-Fastlane. It does not install the app's Flutter or FVM toolchain.
+## Start here
 
-## Use
+The generated workflow from `smf init` is the supported starting point. Do not
+assemble a release workflow from the abbreviated Action calls below.
+
+Follow the canonical SMF guides:
+
+- [Getting started](https://github.com/Ventairy/smf/blob/main/doc/getting-started.md)
+- [Apple and App Store Connect setup](https://github.com/Ventairy/smf/blob/main/doc/apple-bootstrap.md)
+- [Configuration](https://github.com/Ventairy/smf/blob/main/doc/configuration.md)
+- [Release operation and recovery](https://github.com/Ventairy/smf/blob/main/doc/operations.md)
+- [Security](https://github.com/Ventairy/smf/blob/main/doc/security.md)
+
+The complete user manual and recommended reading order live in the
+[SMF user guide](https://github.com/Ventairy/smf/tree/main/doc).
+
+## Generate the workflow
 
 Run the initializer from the Flutter app directory:
 
@@ -36,15 +47,16 @@ smf init \
   --bundle-id com.example.myapp
 ```
 
-`--current-version` is the latest iOS marketing version already represented by
-the repository, not the next version you want to ship. For a never-released
+`--current-version` is the stable iOS version SMF should treat as already
+released, not the next version you want to ship. For an existing store app,
+this is normally the latest shipped marketing version. For a never-released
 app, use `0.0.0` and add `Release-As-ios: 1.0.0` to the first qualifying
 Conventional Commit.
 
 The generated `smf/config.yaml` includes a JSON Schema directive
 for editor validation and autocomplete. The initializer also writes the
 complete multi-job workflow and pins the exact app-local `smf/` path. Its
-essential Action calls are:
+essential Action calls are shown below only to explain the three phases:
 
 ```yaml
 env:
@@ -109,6 +121,10 @@ project toolchain in the workflow. smf automatically uses
 the Git root has `.fvmrc` or legacy `.fvm/fvm_config.json`, and
 `flutter build ipa --release` otherwise.
 
+Commit `.fvmrc` for reproducible local and CI builds. Without FVM, the
+generated workflow installs whichever Flutter release is current on the stable
+channel, so verify compatibility before each candidate.
+
 ```yaml
 platforms:
   ios:
@@ -122,8 +138,11 @@ outside Flutter's standard `build/ios/ipa` directory.
 
 smf appends the planned version, next Apple build number, generated
 export-options plist, and configured flavor automatically.
-`build_command` must be one command invocation; put multi-step preparation,
-logging, and verification in `smf/hooks/before_build.dart`.
+`build_command` must be one command invocation. Use a typed hook for pre-build
+preparation. For a multi-step build or post-build verification, use one
+checked-in executable wrapper that accepts and forwards all appended arguments.
+The [configuration guide](https://github.com/Ventairy/smf/blob/main/doc/configuration.md#build-command-and-ipa-output)
+includes a wrapper example.
 
 Custom workflows must install the selected app's toolchain before any Action
 phase that can run a hook or build the app. The generated workflow does this
@@ -167,12 +186,19 @@ Flutter builds and repository hooks cannot reuse a checkout credential.
 Do not merge the release PR until the release-candidate job has committed its receipt
 and the exact TestFlight build has been tested. The initializer defaults App
 Store behavior to `upload`; submission for review is an explicit
-configuration opt-in.
+configuration opt-in. Follow the
+[before-merge checklist](https://github.com/Ventairy/smf/blob/main/doc/operations.md#before-merging)
+for the complete approval procedure.
 
-## Development
+## Action development
+
+This section is for contributors to `smf-action`, not for repositories using
+the Action.
 
 The Action is deliberately hybrid:
 
+- It vendors the exact SMF Dart workspace source, owns a generated deployment
+  lockfile, installs its own pinned Dart SDK, and enforces that lockfile.
 - Dart owns release planning, GitHub operations, signing, TestFlight, App Store
   Connect, the installed CLI, and the reusable library APIs.
 - TypeScript only reads native Action inputs/context, masks secrets, launches
