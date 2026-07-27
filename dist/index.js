@@ -31412,8 +31412,7 @@ async function run() {
     info(`Running ${selected} for ${repositoryName}`);
     const arguments_ = [
         "run",
-        "smf",
-        "action",
+        "smf:action",
         "--phase",
         selected,
         "--working-directory",
@@ -31431,7 +31430,7 @@ async function run() {
         ignoreReturnCode: true,
     });
     if (result.exitCode !== 0) {
-        const message = result.stderr.trim() || "The Dart CLI failed.";
+        const message = result.stderr.trim() || "The Dart action executable failed.";
         throw new Error(message);
     }
     mapOutputs(selected, parseResult(result.stdout));

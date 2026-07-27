@@ -50,8 +50,7 @@ describe("action adapter", () => {
       "/toolchains/dart-3.10/bin/dart",
       [
         "run",
-        "smf",
-        "action",
+        "smf:action",
         "--phase",
         "pull-request",
         "--working-directory",
@@ -295,7 +294,7 @@ describe("action adapter", () => {
       stdout: "",
     });
 
-    await expect(run()).rejects.toThrow("The Dart CLI failed.");
+    await expect(run()).rejects.toThrow("The Dart action executable failed.");
   });
 
   it("rejects invalid JSON returned by Dart", async () => {

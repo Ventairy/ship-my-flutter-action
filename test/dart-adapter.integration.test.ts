@@ -59,8 +59,7 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
       dart,
       [
         "run",
-        path.join(coreRoot, "bin", "smf.dart"),
-        "init",
+        path.join(coreRoot, "bin", "init.dart"),
         "--bundle-id",
         "dev.example.app",
       ],

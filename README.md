@@ -31,7 +31,7 @@ Run the initializer from the Flutter app directory:
 
 ```bash
 dart pub add --dev smf
-dart run smf init \
+dart run smf:init \
   --current-version <current-ios-version> \
   --bundle-id com.example.myapp
 ```
@@ -174,7 +174,7 @@ configuration opt-in.
 The Action is deliberately hybrid:
 
 - Dart owns release planning, GitHub operations, signing, TestFlight, App Store
-  Connect, the public CLI, and the reusable library API.
+  Connect, the project-local package executables, and the reusable library API.
 - TypeScript only reads native Action inputs/context, masks secrets, launches
   Dart, maps failures, and writes outputs.
 
