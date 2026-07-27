@@ -5,7 +5,7 @@
 ## Metadata
 
 - **Scan Date**: 2026-07-26 17:35:00 -03:00
-- **Project**: ship-my-flutter-action
+- **Project**: smf-action
 - **Repositories Scanned**: 14 repositories
 - **Total Dependencies**: 16 direct packages, package-manager, and GitHub Action dependencies
 - **Scan Duration**: 12 minutes

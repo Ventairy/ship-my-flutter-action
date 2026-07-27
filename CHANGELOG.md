@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to ship-my-flutter-action are documented here.
+All notable changes to smf-action are documented here.
 
 ## [Unreleased]
 

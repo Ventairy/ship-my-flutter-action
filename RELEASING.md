@@ -1,4 +1,4 @@
-# Releasing ship-my-flutter-action
+# Releasing smf-action
 
 Release Please owns `package.json` versions, `CHANGELOG.md`, immutable semantic
 version tags, and GitHub Releases. The Action is not published to npm; users
@@ -50,7 +50,7 @@ Before merging the first stable release PR:
 - exercise signing, upload, receipt recording, and exact-build promotion with
   real Apple credentials;
 - remove the README pre-release warning;
-- verify `dist` and `vendor/ship-my-flutter` match their reviewed sources;
+- verify `dist` and `vendor/smf` match their reviewed sources;
 - confirm the generated tag is `v1.0.0`.
 
 Do not manually edit `.release-please-manifest.json`, release versions, or

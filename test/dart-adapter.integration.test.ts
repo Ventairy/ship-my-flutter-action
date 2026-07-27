@@ -7,12 +7,12 @@ import { afterEach, expect, it } from "vitest";
 
 const exec = promisify(execFile);
 const actionRoot = path.resolve(import.meta.dirname, "..");
-const coreRoot = path.join(actionRoot, "vendor", "ship-my-flutter");
+const coreRoot = path.join(actionRoot, "vendor", "smf");
 const originalEnvironment = { ...process.env };
 
 async function dartExecutable(): Promise<string> {
-  if (process.env.SHIP_MY_FLUTTER_TEST_DART) {
-    return process.env.SHIP_MY_FLUTTER_TEST_DART;
+  if (process.env.SMF_TEST_DART) {
+    return process.env.SMF_TEST_DART;
   }
   const command = (await exec("which", ["dart"])).stdout.trim();
   const sdkBinary = path.resolve(
@@ -59,14 +59,12 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
       dart,
       [
         "run",
-        "ship_my_flutter",
+        path.join(coreRoot, "bin", "smf.dart"),
         "init",
-        "--root",
-        root,
         "--bundle-id",
         "dev.example.app",
       ],
-      { cwd: coreRoot },
+      { cwd: root },
     );
     await exec("git", ["add", "."], { cwd: root });
     await exec("git", ["commit", "-m", "chore: configure releases"], {
@@ -82,8 +80,8 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     process.env.INPUT_GITHUB_TOKEN = "not-a-real-token";
     process.env.INPUT_PHASE = "pull-request";
     process.env.PATH = `${path.dirname(dart)}${path.delimiter}${process.env.PATH ?? ""}`;
-    process.env.SHIP_MY_FLUTTER_CORE_DART = dart;
-    process.env.SHIP_MY_FLUTTER_CONSUMER_PATH = process.env.PATH;
+    process.env.SMF_CORE_DART = dart;
+    process.env.SMF_CONSUMER_PATH = process.env.PATH;
     const { run } = await import("../src/main.js");
     await run();
 

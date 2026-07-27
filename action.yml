@@ -1,4 +1,4 @@
-name: Ship my Flutter
+name: SMF
 description: Open Flutter release PRs, publish TestFlight candidates, and ship the exact tested iOS build.
 author: Ventairy
 
@@ -10,6 +10,9 @@ inputs:
   phase:
     description: "Workflow phase: pull-request, release-candidate, or ship."
     required: true
+  smf-path:
+    description: Explicit app/smf directory when the repository contains multiple apps.
+    required: false
   github-token:
     description: GitHub token used for release PRs, receipts, labels, and releases.
     required: false
@@ -83,29 +86,30 @@ runs:
       run: |
         dart_path="$(command -v dart)"
         if [[ -z "$dart_path" || "$dart_path" == *$'\n'* || "$dart_path" == *$'\r'* ]]; then
-          echo "Could not resolve the ship-my-flutter Dart executable." >&2
+          echo "Could not resolve the smf Dart executable." >&2
           exit 1
         fi
         printf 'dart=%s\n' "$dart_path" >> "$GITHUB_OUTPUT"
 
-    - name: Resolve ship-my-flutter dependencies
+    - name: Resolve smf dependencies
       shell: bash
       env:
         CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
-      run: '"$CORE_DART" pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/ship-my-flutter"'
+      run: '"$CORE_DART" pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/smf"'
 
-    - name: Ship my Flutter
+    - name: SMF
       id: run
       shell: bash
       env:
         INPUT_PHASE: ${{ inputs.phase }}
+        INPUT_SMF_PATH: ${{ inputs.smf-path }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
-        SHIP_MY_FLUTTER_CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
-        SHIP_MY_FLUTTER_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
-        SHIP_MY_FLUTTER_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
-        SHIP_MY_FLUTTER_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
-        SHIP_MY_FLUTTER_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}
-        SHIP_MY_FLUTTER_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
-        SHIP_MY_FLUTTER_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
-        SHIP_MY_FLUTTER_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
+        SMF_CORE_DART: ${{ steps.core-toolchain.outputs.dart }}
+        SMF_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
+        SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
+        SMF_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
+        SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}
+        SMF_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
+        SMF_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
+        SMF_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
       run: node "$GITHUB_ACTION_PATH/dist/index.js"

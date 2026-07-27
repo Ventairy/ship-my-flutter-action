@@ -4,7 +4,7 @@ Install Node.js, pnpm 10, and Dart 3.10 or newer, then run:
 
 ```bash
 pnpm install --frozen-lockfile
-dart pub get --enforce-lockfile -C vendor/ship-my-flutter
+dart pub get --enforce-lockfile -C vendor/smf
 pnpm run check
 ```
 
@@ -20,7 +20,7 @@ Dart 3.10. It copies the core and generates the Action's committed lockfile:
 ```bash
 pnpm run vendor-core
 pnpm install --frozen-lockfile
-dart pub get --enforce-lockfile -C vendor/ship-my-flutter
+dart pub get --enforce-lockfile -C vendor/smf
 pnpm run check
 ```
 

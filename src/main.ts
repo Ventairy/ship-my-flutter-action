@@ -9,13 +9,13 @@ type PullRequestResultPhase = "noop" | "release-candidate" | "ship";
 
 const sensitiveEnvironmentNames = [
   "INPUT_GITHUB_TOKEN",
-  "SHIP_MY_FLUTTER_GITHUB_TOKEN",
-  "SHIP_MY_FLUTTER_APP_STORE_CONNECT_KEY_ID",
-  "SHIP_MY_FLUTTER_APP_STORE_CONNECT_ISSUER_ID",
-  "SHIP_MY_FLUTTER_APP_STORE_CONNECT_PRIVATE_KEY_BASE64",
-  "SHIP_MY_FLUTTER_IOS_CERTIFICATE_BASE64",
-  "SHIP_MY_FLUTTER_IOS_CERTIFICATE_PASSWORD",
-  "SHIP_MY_FLUTTER_IOS_PROVISIONING_PROFILES_BASE64",
+  "SMF_GITHUB_TOKEN",
+  "SMF_APP_STORE_CONNECT_KEY_ID",
+  "SMF_APP_STORE_CONNECT_ISSUER_ID",
+  "SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64",
+  "SMF_IOS_CERTIFICATE_BASE64",
+  "SMF_IOS_CERTIFICATE_PASSWORD",
+  "SMF_IOS_PROVISIONING_PROFILES_BASE64",
 ] as const;
 
 function maskSensitiveInputs(): void {
@@ -50,6 +50,11 @@ function repository(): string {
   return `${parts[0]}/${parts[1]}`;
 }
 
+function smfPath(): string | undefined {
+  const value = process.env.INPUT_SMF_PATH?.trim();
+  return value === "" || value === undefined ? undefined : value;
+}
+
 function childEnvironment(): Record<string, string> {
   const environment: Record<string, string> = {};
   for (const [name, value] of Object.entries(process.env)) {
@@ -58,7 +63,7 @@ function childEnvironment(): Record<string, string> {
   const token = process.env.INPUT_GITHUB_TOKEN?.trim();
   if (!token) throw new Error("github-token is required.");
   delete environment.INPUT_GITHUB_TOKEN;
-  environment.SHIP_MY_FLUTTER_GITHUB_TOKEN = token;
+  environment.SMF_GITHUB_TOKEN = token;
   for (const name of sensitiveEnvironmentNames) {
     delete process.env[name];
   }
@@ -69,13 +74,13 @@ function coreDirectory(): string {
   const actionPath =
     process.env.GITHUB_ACTION_PATH ??
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  return path.join(actionPath, "vendor", "ship-my-flutter");
+  return path.join(actionPath, "vendor", "smf");
 }
 
 function coreDartExecutable(): string {
-  const value = process.env.SHIP_MY_FLUTTER_CORE_DART?.trim();
+  const value = process.env.SMF_CORE_DART?.trim();
   if (!value) {
-    throw new Error("The ship-my-flutter Dart toolchain is missing.");
+    throw new Error("The smf Dart toolchain is missing.");
   }
   return value;
 }
@@ -85,10 +90,10 @@ function parseResult(stdout: string): JsonObject {
   try {
     value = JSON.parse(stdout);
   } catch {
-    throw new Error("ship-my-flutter returned invalid JSON.");
+    throw new Error("smf returned invalid JSON.");
   }
   if (value === null || Array.isArray(value) || typeof value !== "object") {
-    throw new Error("ship-my-flutter returned an invalid result.");
+    throw new Error("smf returned an invalid result.");
   }
   return value as JsonObject;
 }
@@ -101,7 +106,7 @@ function requiredString(
   const value = result[name];
   if (typeof value !== "string" || value.trim() === "") {
     throw new Error(
-      `ship-my-flutter returned an invalid ${context} result: ` +
+      `smf returned an invalid ${context} result: ` +
         `"${name}" must be a non-empty string.`,
     );
   }
@@ -117,7 +122,7 @@ function optionalPositiveInteger(
   if (value === undefined) return undefined;
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
     throw new Error(
-      `ship-my-flutter returned an invalid ${context} result: ` +
+      `smf returned an invalid ${context} result: ` +
         `"${name}" must be a positive integer.`,
     );
   }
@@ -127,7 +132,7 @@ function optionalPositiveInteger(
 function iosPlatform(result: JsonObject, context: string): "ios" {
   if (result.platform !== "ios") {
     throw new Error(
-      `ship-my-flutter returned an invalid ${context} result: ` +
+      `smf returned an invalid ${context} result: ` +
         '"platform" must be "ios".',
     );
   }
@@ -140,7 +145,7 @@ function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
     return value;
   }
   throw new Error(
-    'ship-my-flutter returned an invalid pull-request result: "phase" must be ' +
+    'smf returned an invalid pull-request result: "phase" must be ' +
       '"noop", "release-candidate", or "ship".',
   );
 }
@@ -224,31 +229,32 @@ export async function run(): Promise<void> {
   }
   const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const repositoryName = repository();
+  const selectedSmfPath = smfPath();
   const executable = coreDartExecutable();
   const environment = childEnvironment();
-  const consumerPath = process.env.SHIP_MY_FLUTTER_CONSUMER_PATH;
+  const consumerPath = process.env.SMF_CONSUMER_PATH;
   if (consumerPath) environment.PATH = consumerPath;
   core.info(`Running ${selected} for ${repositoryName}`);
-  const result = await exec.getExecOutput(
-    executable,
-    [
-      "run",
-      "ship_my_flutter",
-      "action",
-      "--phase",
-      selected,
-      "--root",
-      repositoryRoot,
-      "--repository",
-      repositoryName,
-    ],
-    {
-      cwd: coreDirectory(),
-      env: environment,
-      silent: true,
-      ignoreReturnCode: true,
-    },
-  );
+  const arguments_ = [
+    "run",
+    "smf",
+    "action",
+    "--phase",
+    selected,
+    "--working-directory",
+    repositoryRoot,
+    "--repository",
+    repositoryName,
+  ];
+  if (selectedSmfPath !== undefined) {
+    arguments_.push("--smf-path", selectedSmfPath);
+  }
+  const result = await exec.getExecOutput(executable, arguments_, {
+    cwd: coreDirectory(),
+    env: environment,
+    silent: true,
+    ignoreReturnCode: true,
+  });
   if (result.exitCode !== 0) {
     const message = result.stderr.trim() || "The Dart CLI failed.";
     throw new Error(message);

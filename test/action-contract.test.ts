@@ -18,8 +18,8 @@ describe("composite action contract", () => {
 
     expect(action).toContain("Preserve consumer toolchain");
     expect(action).toContain("dart-lang/setup-dart@");
-    expect(action).toContain("SHIP_MY_FLUTTER_CORE_DART:");
-    expect(action).toContain("SHIP_MY_FLUTTER_CONSUMER_PATH:");
+    expect(action).toContain("SMF_CORE_DART:");
+    expect(action).toContain("SMF_CONSUMER_PATH:");
   });
 
   it("documents the complete workflow phase protocol", async () => {
@@ -31,5 +31,13 @@ describe("composite action contract", () => {
     expect(action).not.toContain(
       "Workflow phase: plan, candidate, or promote.",
     );
+  });
+
+  it("exposes explicit SMF app selection without app-path configuration", async () => {
+    const action = await fs.readFile(actionPath, "utf8");
+
+    expect(action).toContain("smf-path:");
+    expect(action).toContain("INPUT_SMF_PATH:");
+    expect(action).not.toContain("app-path:");
   });
 });

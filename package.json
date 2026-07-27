@@ -1,7 +1,7 @@
 {
-  "name": "ship-my-flutter-action",
+  "name": "smf-action",
   "version": "0.1.0",
-  "description": "The official GitHub Action for ship-my-flutter.",
+  "description": "The official GitHub Action for smf.",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.34.5+sha512.a4ee05f2f73658255bd6a89859c065a45c28a57daefae2c893a168ee2b73168c37b91e83e57ea67654ad03f03031746430e8bce38e362e042605fb8abc80192e",
@@ -31,7 +31,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ventairy/ship-my-flutter-action.git"
+    "url": "git+https://github.com/Ventairy/smf-action.git"
   },
   "dependencies": {
     "@actions/core": "3.0.1",

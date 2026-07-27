@@ -1,17 +1,17 @@
-# ship-my-flutter-action
+# smf-action
 
-[![CI](https://github.com/Ventairy/ship-my-flutter-action/actions/workflows/ci.yml/badge.svg)](https://github.com/Ventairy/ship-my-flutter-action/actions/workflows/ci.yml)
+[![CI](https://github.com/Ventairy/smf-action/actions/workflows/ci.yml/badge.svg)](https://github.com/Ventairy/smf-action/actions/workflows/ci.yml)
 
-The official GitHub Action for [ship-my-flutter](https://github.com/Ventairy/ship-my-flutter).
+The official GitHub Action for [smf](https://github.com/Ventairy/smf).
 
 > [!WARNING]
 > This action is in pre-release validation and has no `v1` tag yet. The public
 > integration fixture is pinned to an exact tested commit; production `@v1`
 > publication remains tracked in
-> [action issue #1](https://github.com/Ventairy/ship-my-flutter-action/issues/1)
+> [action issue #1](https://github.com/Ventairy/smf-action/issues/1)
 > after the live Apple acceptance gate. Examples below describe the intended
 > stable interface. Non-Apple action behavior is exercised publicly in
-> [`Ventairy/ship-my-flutter-dart-e2e`](https://github.com/Ventairy/ship-my-flutter-dart-e2e).
+> [`Ventairy/smf-e2e`](https://github.com/Ventairy/smf-e2e).
 
 It exposes the full release lifecycle through one action:
 
@@ -30,8 +30,8 @@ Fastlane. It does not install the app's Flutter or FVM toolchain.
 Run the initializer from the Flutter repository:
 
 ```bash
-dart pub add --dev ship_my_flutter
-dart run ship_my_flutter init \
+dart pub add --dev smf
+dart run smf init \
   --current-version <current-ios-version> \
   --bundle-id com.example.myapp
 ```
@@ -41,33 +41,33 @@ the repository, not the next version you want to ship. For a never-released
 app, use `0.0.0` and add `Release-As-ios: 1.0.0` to the first qualifying
 Conventional Commit.
 
-The generated `.ship-my-flutter/config.yaml` includes a JSON Schema directive
+The generated `smf/config.yaml` includes a JSON Schema directive
 for editor validation and autocomplete. The initializer also writes the
 complete multi-job workflow. Its essential action steps are:
 
 ```yaml
-- uses: Ventairy/ship-my-flutter-action@v1
+- uses: Ventairy/smf-action@v1
   with:
     phase: pull-request
 
-- if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') != '' }}
+- if: ${{ hashFiles('**/.fvmrc', '**/.fvm/fvm_config.json') != '' }}
   uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
   with:
     sdk: 3.10.0
 
-- if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') != '' }}
+- if: ${{ hashFiles('**/.fvmrc', '**/.fvm/fvm_config.json') != '' }}
   run: |
     dart pub global activate fvm 4.1.2
-    fvm install
+    # The generated workflow resolves the app and runs fvm install there.
 
-- if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') == '' }}
+- if: ${{ hashFiles('**/.fvmrc', '**/.fvm/fvm_config.json') == '' }}
   uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
   with:
     channel: stable
     cache: true
     pub-cache: true
 
-- uses: Ventairy/ship-my-flutter-action@v1
+- uses: Ventairy/smf-action@v1
   with:
     phase: release-candidate
     app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -77,7 +77,7 @@ complete multi-job workflow. Its essential action steps are:
     ios-certificate-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
     ios-provisioning-profiles-base64: ${{ secrets.IOS_PROVISIONING_PROFILES_BASE64 }}
 
-- uses: Ventairy/ship-my-flutter-action@v1
+- uses: Ventairy/smf-action@v1
   with:
     phase: ship
     app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -91,7 +91,7 @@ complete multi-job workflow. Its essential action steps are:
 > step. The generated workflow installs FVM and its declared SDK when it finds
 > `.fvmrc` or legacy `.fvm/fvm_config.json`; repositories without FVM receive
 > current stable Flutter.
-> Use an App Store Connect API key with `Developer` access only for upload-only
+> Use an App Store Connect API key with `Developer` access only for `upload`
 > delivery without TestFlight groups. Group assignment and App Review
 > submission require at least `App Manager` access.
 > The generated workflow uses GitHub-hosted `macos-26`; a compatible ephemeral
@@ -99,19 +99,20 @@ complete multi-job workflow. Its essential action steps are:
 
 ## Inputs
 
-| Input                                  | Phase                  | Required      | Purpose                                             |
-| -------------------------------------- | ---------------------- | ------------- | --------------------------------------------------- |
-| `phase`                                | all                    | yes           | `pull-request`, `release-candidate`, or `ship`      |
-| `github-token`                         | all                    | default token | Maintains PRs, receipts, labels, tags, and releases |
-| `app-store-connect-key-id`             | release-candidate/ship | yes           | API key ID                                          |
-| `app-store-connect-issuer-id`          | release-candidate/ship | yes           | API issuer ID                                       |
-| `app-store-connect-private-key-base64` | release-candidate/ship | yes           | Base64 `.p8`                                        |
-| `ios-certificate-base64`               | release-candidate      | yes           | Base64 Apple Distribution `.p12`                    |
-| `ios-certificate-password`             | release-candidate      | yes           | `.p12` password                                     |
-| `ios-provisioning-profiles-base64`     | release-candidate      | yes           | Base64 profile or bundle-ID JSON map                |
+| Input                                  | Phase                  | Required      | Purpose                                                 |
+| -------------------------------------- | ---------------------- | ------------- | ------------------------------------------------------- |
+| `phase`                                | all                    | yes           | `pull-request`, `release-candidate`, or `ship`          |
+| `smf-path`                             | all                    | one app: no   | Explicit `app/smf` directory for multi-app repositories |
+| `github-token`                         | all                    | default token | Maintains PRs, receipts, labels, tags, and releases     |
+| `app-store-connect-key-id`             | release-candidate/ship | yes           | API key ID                                              |
+| `app-store-connect-issuer-id`          | release-candidate/ship | yes           | API issuer ID                                           |
+| `app-store-connect-private-key-base64` | release-candidate/ship | yes           | Base64 `.p8`                                            |
+| `ios-certificate-base64`               | release-candidate      | yes           | Base64 Apple Distribution `.p12`                        |
+| `ios-certificate-password`             | release-candidate      | yes           | `.p12` password                                         |
+| `ios-provisioning-profiles-base64`     | release-candidate      | yes           | Base64 profile or bundle-ID JSON map                    |
 
 The Action intentionally has no Flutter-version inputs. Configure the exact
-project toolchain in the workflow. ship-my-flutter automatically uses
+project toolchain in the workflow. smf automatically uses
 `fvm flutter build ipa --release` when the project or repository has `.fvmrc`
 or legacy `.fvm/fvm_config.json`, and `flutter build ipa --release` otherwise.
 
@@ -126,14 +127,14 @@ Both fields are optional. Override `build_command` only for a custom wrapper or
 build system. Override `ipa_output_path` only when that command writes the IPA
 outside Flutter's standard `build/ios/ipa` directory.
 
-ship-my-flutter appends the planned version, next Apple build number, generated
+smf appends the planned version, next Apple build number, generated
 export-options plist, and configured flavor automatically.
 `build_command` must be one command invocation; put multi-step preparation,
-logging, and verification in `hooks.before_build.run`.
+logging, and verification in `smf/hooks/before_build.dart`.
 
-If `hooks.before_create_pr.run` invokes Flutter, FVM, or a newer project Dart SDK,
-run the same project setup before the pull-request Action step. The Action preserves
-whatever toolchain `PATH` exists when each invocation begins.
+If `smf/hooks/before_create_pr.dart` invokes Flutter, FVM, or a newer project
+Dart SDK, run the same project setup before the pull-request Action step. The
+Action preserves whatever toolchain `PATH` exists when each invocation begins.
 
 ## Outputs
 
@@ -166,7 +167,7 @@ Flutter builds and repository hooks cannot reuse a checkout credential.
 
 Do not merge the release PR until the release-candidate job has committed its receipt
 and the exact TestFlight build has been tested. The initializer defaults App
-Store behavior to `upload-only`; submission for review is an explicit
+Store behavior to `upload`; submission for review is an explicit
 configuration opt-in.
 
 ## Development
@@ -186,7 +187,7 @@ Flutter SDK.
 
 The repository checks in two generated artifacts:
 
-- `vendor/ship-my-flutter`: exact Dart package source, Action-owned deployment
+- `vendor/smf`: exact Dart package source, Action-owned deployment
   lockfile, and `CORE_COMMIT` provenance record;
 - `dist`: bundled thin TypeScript Action adapter.
 
@@ -202,10 +203,10 @@ generates the Action's deployment lockfile:
 pnpm run vendor-core
 pnpm install --frozen-lockfile
 pnpm run format
-dart pub get --enforce-lockfile -C vendor/ship-my-flutter
+dart pub get --enforce-lockfile -C vendor/smf
 pnpm run check
 ```
 
 Review both generated diffs before release. Follow this repository's
 [Action release procedure](RELEASING.md) and the core
-[release procedure](https://github.com/Ventairy/ship-my-flutter/blob/main/RELEASING.md).
+[release procedure](https://github.com/Ventairy/smf/blob/main/RELEASING.md).

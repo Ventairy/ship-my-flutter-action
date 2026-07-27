@@ -18,8 +18,8 @@ beforeEach(() => {
   process.env.GITHUB_ACTION_PATH = "/action";
   process.env.GITHUB_REPOSITORY = "ventairy/example";
   process.env.INPUT_GITHUB_TOKEN = "token";
-  process.env.SHIP_MY_FLUTTER_CORE_DART = "/toolchains/dart-3.10/bin/dart";
-  process.env.SHIP_MY_FLUTTER_CONSUMER_PATH = "/project/flutter/bin:/usr/bin";
+  process.env.SMF_CORE_DART = "/toolchains/dart-3.10/bin/dart";
+  process.env.SMF_CONSUMER_PATH = "/project/flutter/bin:/usr/bin";
 });
 
 afterEach(() => {
@@ -39,7 +39,7 @@ describe("action adapter", () => {
         phase: "release-candidate",
         platform: "ios",
         version: "1.2.0",
-        branch: "ship-my-flutter/ios",
+        branch: "smf/ios",
         pullRequestNumber: 12,
       }),
     });
@@ -50,17 +50,17 @@ describe("action adapter", () => {
       "/toolchains/dart-3.10/bin/dart",
       [
         "run",
-        "ship_my_flutter",
+        "smf",
         "action",
         "--phase",
         "pull-request",
-        "--root",
+        "--working-directory",
         "/workspace",
         "--repository",
         "ventairy/example",
       ],
       expect.objectContaining({
-        cwd: "/action/vendor/ship-my-flutter",
+        cwd: "/action/vendor/smf",
         env: expect.objectContaining({
           PATH: "/project/flutter/bin:/usr/bin",
         }),
@@ -71,6 +71,24 @@ describe("action adapter", () => {
     expect(setOutput).toHaveBeenCalledWith("pull-request-number", "12");
     expect(setSecret).toHaveBeenCalledWith("token");
     expect(process.env.INPUT_GITHUB_TOKEN).toBeUndefined();
+  });
+
+  it("forwards an explicit SMF directory for a multi-app repository", async () => {
+    process.env.INPUT_PHASE = "pull-request";
+    process.env.INPUT_SMF_PATH = "apps/mobile/smf";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({ phase: "noop" }),
+    });
+
+    await run();
+
+    expect(getExecOutput).toHaveBeenCalledWith(
+      "/toolchains/dart-3.10/bin/dart",
+      expect.arrayContaining(["--smf-path", "apps/mobile/smf"]),
+      expect.anything(),
+    );
   });
 
   it("rejects release-candidate builds on a non-macOS runner", async () => {
@@ -199,7 +217,7 @@ describe("action adapter", () => {
         phase: "release-candidate",
         platform: "ios",
         version: "1.2.0",
-        branch: "ship-my-flutter/ios",
+        branch: "smf/ios",
         pullRequestNumber: "12",
       }),
     });
@@ -262,7 +280,7 @@ describe("action adapter", () => {
     process.env.INPUT_PHASE = "pull-request";
     getExecOutput.mockResolvedValue({
       exitCode: 1,
-      stderr: "ship-my-flutter [CONFIG]: invalid configuration",
+      stderr: "smf [CONFIG]: invalid configuration",
       stdout: "",
     });
     await expect(run()).rejects.toThrow("[CONFIG]: invalid configuration");
@@ -315,7 +333,7 @@ describe("action adapter", () => {
 
   it("requires the isolated Dart toolchain before launching the core", async () => {
     process.env.INPUT_PHASE = "pull-request";
-    delete process.env.SHIP_MY_FLUTTER_CORE_DART;
+    delete process.env.SMF_CORE_DART;
 
     await expect(run()).rejects.toThrow("Dart toolchain is missing");
     expect(getExecOutput).not.toHaveBeenCalled();
@@ -333,7 +351,7 @@ describe("action adapter", () => {
 
   it("masks every supplied release credential before execution", async () => {
     process.env.INPUT_PHASE = "pull-request";
-    process.env.SHIP_MY_FLUTTER_IOS_CERTIFICATE_PASSWORD = "p12-password";
+    process.env.SMF_IOS_CERTIFICATE_PASSWORD = "p12-password";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",

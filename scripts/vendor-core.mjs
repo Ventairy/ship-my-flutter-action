@@ -9,8 +9,8 @@ const actionRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const coreRoot = path.resolve(actionRoot, "..", "ship-my-flutter");
-const destination = path.join(actionRoot, "vendor", "ship-my-flutter");
+const coreRoot = path.resolve(actionRoot, "..", "smf");
+const destination = path.join(actionRoot, "vendor", "smf");
 
 const [{ stdout: coreCommit }, { stdout: coreStatus }] = await Promise.all([
   execFileAsync("git", ["rev-parse", "HEAD"], { cwd: coreRoot }),
