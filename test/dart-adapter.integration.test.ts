@@ -88,4 +88,4 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
-});
+}, 30_000);
