@@ -30,9 +30,10 @@ All notable changes to ship-my-flutter-action are documented here.
 
 ### Changed
 
+- Auto-detect FVM builds from repository configuration and renamed the optional
+  IPA location setting to `ipa_output_path`.
 - Left Flutter/FVM installation to consumer workflows and preserved the
   incoming project `PATH` for hooks and builds while running the vendored core
   through an isolated pinned Dart SDK.
-- Defaulted standard projects to `flutter build ipa --release` and
-  `build/ios/ipa`, so build overrides are needed only for custom toolchains or
-  artifact locations.
+- Defaulted projects to automatic FVM/Flutter selection and `build/ios/ipa`, so
+  build overrides are needed only for custom wrappers or IPA locations.

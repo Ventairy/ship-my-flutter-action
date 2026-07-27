@@ -23,8 +23,7 @@ It exposes the full release lifecycle through one action:
 The Action vendors the exact Dart core source and owns a generated deployment
 lockfile for it. It installs its own pinned Dart SDK and enforces that lockfile
 automatically, so consumer repositories do not install Node packages or
-Fastlane. It does not install Flutter or FVM: the app repository owns the
-toolchain used by its configured `build_command`.
+Fastlane. It does not install the app's Flutter or FVM toolchain.
 
 ## Use
 
@@ -51,9 +50,20 @@ complete multi-job workflow. Its essential action steps are:
   with:
     phase: plan
 
-- uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+- if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') != '' }}
+  uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
   with:
-    flutter-version-file: ${{ hashFiles('.fvmrc') != '' && '.fvmrc' || '' }}
+    sdk: 3.10.0
+
+- if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') != '' }}
+  run: |
+    dart pub global activate fvm 4.1.2
+    fvm install
+
+- if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') == '' }}
+  uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+  with:
+    channel: stable
     cache: true
     pub-cache: true
 
@@ -78,10 +88,9 @@ complete multi-job workflow. Its essential action steps are:
 > [!IMPORTANT]
 > The candidate phase requires macOS and the supported Xcode/Flutter toolchain.
 > Install the project's exact Flutter/FVM toolchain before the candidate Action
-> step. The generated workflow pins `subosito/flutter-action` to a reviewed
-> commit; projects using FVM can replace that setup with their established
-> bootstrap. A root `.fvmrc` is used automatically; repositories without one
-> receive current stable Flutter.
+> step. The generated workflow installs FVM and its declared SDK when it finds
+> `.fvmrc` or legacy `.fvm/fvm_config.json`; repositories without FVM receive
+> current stable Flutter.
 > Use an App Store Connect API key with `Developer` access only for upload-only
 > delivery without TestFlight groups. Group assignment and App Review
 > submission require at least `App Manager` access.
@@ -102,19 +111,20 @@ complete multi-job workflow. Its essential action steps are:
 | `ios-provisioning-profiles-base64`     | candidate         | yes           | Base64 profile or bundle-ID JSON map                |
 
 The Action intentionally has no Flutter-version inputs. Configure the exact
-project toolchain in the workflow, then configure the project-owned shell build
-invocation in `.ship-my-flutter/config.yaml`:
+project toolchain in the workflow. ship-my-flutter automatically uses
+`fvm flutter build ipa --release` when the project or repository has `.fvmrc`
+or legacy `.fvm/fvm_config.json`, and `flutter build ipa --release` otherwise.
 
 ```yaml
 platforms:
   ios:
-    build_command: fvm flutter build ipa --release
-    artifact_path: build/ios/ipa
+    build_command: fvm dart run release:build_ios
+    ipa_output_path: dist/ios
 ```
 
-Both fields are optional. Without them, ship-my-flutter uses
-`flutter build ipa --release` and `build/ios/ipa`. Override them only for FVM,
-Melos, a custom wrapper, or a nonstandard artifact location.
+Both fields are optional. Override `build_command` only for a custom wrapper or
+build system. Override `ipa_output_path` only when that command writes the IPA
+outside Flutter's standard `build/ios/ipa` directory.
 
 ship-my-flutter appends the planned version, next Apple build number, generated
 export-options plist, and configured flavor automatically.
