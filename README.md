@@ -27,7 +27,7 @@ Fastlane. It does not install the app's Flutter or FVM toolchain.
 
 ## Use
 
-Run the initializer from the Flutter repository:
+Run the initializer from the Flutter app directory:
 
 ```bash
 dart pub add --dev smf
@@ -43,33 +43,22 @@ Conventional Commit.
 
 The generated `smf/config.yaml` includes a JSON Schema directive
 for editor validation and autocomplete. The initializer also writes the
-complete multi-job workflow. Its essential action steps are:
+complete multi-job workflow and pins the exact app-local `smf/` path. Its
+essential Action calls are:
 
 ```yaml
+env:
+  SMF_PATH: apps/mobile/smf
+
 - uses: Ventairy/smf-action@v1
   with:
     phase: pull-request
-
-- if: ${{ hashFiles('**/.fvmrc', '**/.fvm/fvm_config.json') != '' }}
-  uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
-  with:
-    sdk: 3.10.0
-
-- if: ${{ hashFiles('**/.fvmrc', '**/.fvm/fvm_config.json') != '' }}
-  run: |
-    dart pub global activate fvm 4.1.2
-    # The generated workflow resolves the app and runs fvm install there.
-
-- if: ${{ hashFiles('**/.fvmrc', '**/.fvm/fvm_config.json') == '' }}
-  uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-  with:
-    channel: stable
-    cache: true
-    pub-cache: true
+    smf-path: ${{ env.SMF_PATH }}
 
 - uses: Ventairy/smf-action@v1
   with:
     phase: release-candidate
+    smf-path: ${{ env.SMF_PATH }}
     app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
     app-store-connect-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
     app-store-connect-private-key-base64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
@@ -80,6 +69,7 @@ complete multi-job workflow. Its essential action steps are:
 - uses: Ventairy/smf-action@v1
   with:
     phase: ship
+    smf-path: ${{ env.SMF_PATH }}
     app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
     app-store-connect-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
     app-store-connect-private-key-base64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
@@ -87,10 +77,12 @@ complete multi-job workflow. Its essential action steps are:
 
 > [!IMPORTANT]
 > The release-candidate phase requires macOS and the supported Xcode/Flutter toolchain.
-> Install the project's exact Flutter/FVM toolchain before the release-candidate Action
-> step. The generated workflow installs FVM and its declared SDK when it finds
-> `.fvmrc` or legacy `.fvm/fvm_config.json`; repositories without FVM receive
-> current stable Flutter.
+> The generated workflow searches only the selected app and its ancestors for
+> `.fvmrc` or legacy `.fvm/fvm_config.json`, then installs that declared SDK.
+> Repositories without FVM receive current stable Flutter. When
+> `before_create_pr.dart` exists, the pull-request job installs the same
+> selected project toolchain before invoking the Action; otherwise that job
+> avoids the unnecessary setup.
 > Use an App Store Connect API key with `Developer` access only for `upload`
 > delivery without TestFlight groups. Group assignment and App Review
 > submission require at least `App Manager` access.
@@ -99,22 +91,23 @@ complete multi-job workflow. Its essential action steps are:
 
 ## Inputs
 
-| Input                                  | Phase                  | Required      | Purpose                                                 |
-| -------------------------------------- | ---------------------- | ------------- | ------------------------------------------------------- |
-| `phase`                                | all                    | yes           | `pull-request`, `release-candidate`, or `ship`          |
-| `smf-path`                             | all                    | one app: no   | Explicit `app/smf` directory for multi-app repositories |
-| `github-token`                         | all                    | default token | Maintains PRs, receipts, labels, tags, and releases     |
-| `app-store-connect-key-id`             | release-candidate/ship | yes           | API key ID                                              |
-| `app-store-connect-issuer-id`          | release-candidate/ship | yes           | API issuer ID                                           |
-| `app-store-connect-private-key-base64` | release-candidate/ship | yes           | Base64 `.p8`                                            |
-| `ios-certificate-base64`               | release-candidate      | yes           | Base64 Apple Distribution `.p12`                        |
-| `ios-certificate-password`             | release-candidate      | yes           | `.p12` password                                         |
-| `ios-provisioning-profiles-base64`     | release-candidate      | yes           | Base64 profile or bundle-ID JSON map                    |
+| Input                                  | Phase                  | Required      | Purpose                                                     |
+| -------------------------------------- | ---------------------- | ------------- | ----------------------------------------------------------- |
+| `phase`                                | all                    | yes           | `pull-request`, `release-candidate`, or `ship`              |
+| `smf-path`                             | all                    | one app: no   | Exact app-local `smf` directory when discovery is ambiguous |
+| `github-token`                         | all                    | default token | Maintains PRs, receipts, labels, tags, and releases         |
+| `app-store-connect-key-id`             | release-candidate/ship | yes           | API key ID                                                  |
+| `app-store-connect-issuer-id`          | release-candidate/ship | yes           | API issuer ID                                               |
+| `app-store-connect-private-key-base64` | release-candidate/ship | yes           | Base64 `.p8`                                                |
+| `ios-certificate-base64`               | release-candidate      | yes           | Base64 Apple Distribution `.p12`                            |
+| `ios-certificate-password`             | release-candidate      | yes           | `.p12` password                                             |
+| `ios-provisioning-profiles-base64`     | release-candidate      | yes           | Base64 profile or bundle-ID JSON map                        |
 
 The Action intentionally has no Flutter-version inputs. Configure the exact
 project toolchain in the workflow. smf automatically uses
-`fvm flutter build ipa --release` when the project or repository has `.fvmrc`
-or legacy `.fvm/fvm_config.json`, and `flutter build ipa --release` otherwise.
+`fvm flutter build ipa --release` when the selected app or an ancestor up to
+the Git root has `.fvmrc` or legacy `.fvm/fvm_config.json`, and
+`flutter build ipa --release` otherwise.
 
 ```yaml
 platforms:
@@ -132,9 +125,15 @@ export-options plist, and configured flavor automatically.
 `build_command` must be one command invocation; put multi-step preparation,
 logging, and verification in `smf/hooks/before_build.dart`.
 
-If `smf/hooks/before_create_pr.dart` invokes Flutter, FVM, or a newer project
-Dart SDK, run the same project setup before the pull-request Action step. The
-Action preserves whatever toolchain `PATH` exists when each invocation begins.
+Custom workflows must install the selected app's toolchain before any Action
+phase that can run a hook or build the app. The generated workflow does this
+automatically. The Action preserves whatever toolchain `PATH` exists when each
+invocation begins.
+
+One Git repository currently supports one independently released SMF app.
+`smf-path` chooses the app/configuration but does not namespace the shared
+`smf/ios` branch or `ios-vX.Y.Z` tags. Use separate repositories for
+independently released apps until app-scoped namespaces are supported.
 
 ## Outputs
 
