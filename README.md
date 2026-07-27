@@ -15,9 +15,9 @@ The official GitHub Action for [ship-my-flutter](https://github.com/Ventairy/shi
 
 It exposes the full release lifecycle through one action:
 
-- `plan` opens or updates the platform release PR;
-- `candidate` builds, signs, uploads, and records the exact TestFlight build;
-- `promote` verifies that recorded build after merge, optionally submits it
+- `pull-request` opens or updates the platform release PR;
+- `release-candidate` builds, signs, uploads, and records the exact TestFlight build;
+- `ship` verifies that recorded build after merge, optionally submits it
   when configured, and completes the platform GitHub Release.
 
 The Action vendors the exact Dart core source and owns a generated deployment
@@ -48,7 +48,7 @@ complete multi-job workflow. Its essential action steps are:
 ```yaml
 - uses: Ventairy/ship-my-flutter-action@v1
   with:
-    phase: plan
+    phase: pull-request
 
 - if: ${{ hashFiles('.fvmrc', '.fvm/fvm_config.json') != '' }}
   uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
@@ -69,7 +69,7 @@ complete multi-job workflow. Its essential action steps are:
 
 - uses: Ventairy/ship-my-flutter-action@v1
   with:
-    phase: candidate
+    phase: release-candidate
     app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
     app-store-connect-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
     app-store-connect-private-key-base64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
@@ -79,15 +79,15 @@ complete multi-job workflow. Its essential action steps are:
 
 - uses: Ventairy/ship-my-flutter-action@v1
   with:
-    phase: promote
+    phase: ship
     app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
     app-store-connect-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
     app-store-connect-private-key-base64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
 ```
 
 > [!IMPORTANT]
-> The candidate phase requires macOS and the supported Xcode/Flutter toolchain.
-> Install the project's exact Flutter/FVM toolchain before the candidate Action
+> The release-candidate phase requires macOS and the supported Xcode/Flutter toolchain.
+> Install the project's exact Flutter/FVM toolchain before the release-candidate Action
 > step. The generated workflow installs FVM and its declared SDK when it finds
 > `.fvmrc` or legacy `.fvm/fvm_config.json`; repositories without FVM receive
 > current stable Flutter.
@@ -95,20 +95,20 @@ complete multi-job workflow. Its essential action steps are:
 > delivery without TestFlight groups. Group assignment and App Review
 > submission require at least `App Manager` access.
 > The generated workflow uses GitHub-hosted `macos-26`; a compatible ephemeral
-> self-hosted runner is also valid. Plan and promote can run on Ubuntu.
+> self-hosted runner is also valid. Pull-request and ship can run on Ubuntu.
 
 ## Inputs
 
-| Input                                  | Phase             | Required      | Purpose                                             |
-| -------------------------------------- | ----------------- | ------------- | --------------------------------------------------- |
-| `phase`                                | all               | yes           | `plan`, `candidate`, or `promote`                   |
-| `github-token`                         | all               | default token | Maintains PRs, receipts, labels, tags, and releases |
-| `app-store-connect-key-id`             | candidate/promote | yes           | API key ID                                          |
-| `app-store-connect-issuer-id`          | candidate/promote | yes           | API issuer ID                                       |
-| `app-store-connect-private-key-base64` | candidate/promote | yes           | Base64 `.p8`                                        |
-| `ios-certificate-base64`               | candidate         | yes           | Base64 Apple Distribution `.p12`                    |
-| `ios-certificate-password`             | candidate         | yes           | `.p12` password                                     |
-| `ios-provisioning-profiles-base64`     | candidate         | yes           | Base64 profile or bundle-ID JSON map                |
+| Input                                  | Phase                  | Required      | Purpose                                             |
+| -------------------------------------- | ---------------------- | ------------- | --------------------------------------------------- |
+| `phase`                                | all                    | yes           | `pull-request`, `release-candidate`, or `ship`      |
+| `github-token`                         | all                    | default token | Maintains PRs, receipts, labels, tags, and releases |
+| `app-store-connect-key-id`             | release-candidate/ship | yes           | API key ID                                          |
+| `app-store-connect-issuer-id`          | release-candidate/ship | yes           | API issuer ID                                       |
+| `app-store-connect-private-key-base64` | release-candidate/ship | yes           | Base64 `.p8`                                        |
+| `ios-certificate-base64`               | release-candidate      | yes           | Base64 Apple Distribution `.p12`                    |
+| `ios-certificate-password`             | release-candidate      | yes           | `.p12` password                                     |
+| `ios-provisioning-profiles-base64`     | release-candidate      | yes           | Base64 profile or bundle-ID JSON map                |
 
 The Action intentionally has no Flutter-version inputs. Configure the exact
 project toolchain in the workflow. ship-my-flutter automatically uses
@@ -132,24 +132,24 @@ export-options plist, and configured flavor automatically.
 logging, and verification in `hooks.before_build.run`.
 
 If `hooks.before_create_pr.run` invokes Flutter, FVM, or a newer project Dart SDK,
-run the same project setup before the plan Action step. The Action preserves
+run the same project setup before the pull-request Action step. The Action preserves
 whatever toolchain `PATH` exists when each invocation begins.
 
 ## Outputs
 
 The action emits fields relevant to the selected phase:
 
-| Selected phase | Outputs                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `plan`         | `phase` (`noop`, `candidate`, or `promote`), plus `platform`, `version`, `branch`, and `pull-request-number` when relevant |
-| `candidate`    | `phase=candidate`, `platform`, `version`, `build-id`, and `build-number`                                                   |
-| `promote`      | `phase=promote`, `platform`, `version`, `build-id`, and `release-url`                                                      |
+| Selected phase      | Outputs                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `pull-request`      | `phase` (`noop`, `release-candidate`, or `ship`), plus `platform`, `version`, `branch`, and `pull-request-number` when relevant |
+| `release-candidate` | `phase=release-candidate`, `platform`, `version`, `build-id`, and `build-number`                                                |
+| `ship`              | `phase=ship`, `platform`, `version`, `build-id`, and `release-url`                                                              |
 
-The generated workflow uses `phase` and `branch` to dispatch the macOS candidate job without depending on token-generated pushes to start another workflow.
+The generated workflow uses `phase` and `branch` to dispatch the macOS release-candidate job without depending on token-generated pushes to start another workflow.
 
-When `plan` uses the default `GITHUB_TOKEN`, GitHub does not create new workflow
-runs for the resulting PR event. This Action's candidate still runs because the
-generated workflow dispatches it from the plan output. If the repository's
+When `pull-request` uses the default `GITHUB_TOKEN`, GitHub does not create new workflow
+runs for the resulting PR event. This Action's release-candidate still runs because the
+generated workflow dispatches it from the pull-request output. If the repository's
 other `pull_request` workflows must run, pass a GitHub App installation token
 (preferred) or a narrowly scoped personal access token through `github-token`.
 
@@ -164,7 +164,7 @@ Generated checkouts use `persist-credentials: false`. The action exposes its
 token only to the individual authenticated Git operation that needs it, so
 Flutter builds and repository hooks cannot reuse a checkout credential.
 
-Do not merge the release PR until the candidate job has committed its receipt
+Do not merge the release PR until the release-candidate job has committed its receipt
 and the exact TestFlight build has been tested. The initializer defaults App
 Store behavior to `upload-only`; submission for review is an explicit
 configuration opt-in.

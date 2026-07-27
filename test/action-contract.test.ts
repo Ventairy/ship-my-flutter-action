@@ -21,4 +21,15 @@ describe("composite action contract", () => {
     expect(action).toContain("SHIP_MY_FLUTTER_CORE_DART:");
     expect(action).toContain("SHIP_MY_FLUTTER_CONSUMER_PATH:");
   });
+
+  it("documents the complete workflow phase protocol", async () => {
+    const action = await fs.readFile(actionPath, "utf8");
+
+    expect(action).toContain(
+      "Workflow phase: pull-request, release-candidate, or ship.",
+    );
+    expect(action).not.toContain(
+      "Workflow phase: plan, candidate, or promote.",
+    );
+  });
 });

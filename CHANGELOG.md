@@ -30,6 +30,7 @@ All notable changes to ship-my-flutter-action are documented here.
 
 ### Changed
 
+- Renamed the Action phases to `pull-request`, `release-candidate`, and `ship`.
 - Auto-detect FVM builds from repository configuration and renamed the optional
   IPA location setting to `ipa_output_path`.
 - Left Flutter/FVM installation to consumer workflows and preserved the

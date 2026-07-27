@@ -31244,7 +31244,9 @@ function maskSensitiveInputs() {
 }
 function phase() {
     const value = process.env.INPUT_PHASE?.trim();
-    if (value === "plan" || value === "candidate" || value === "promote") {
+    if (value === "pull-request" ||
+        value === "release-candidate" ||
+        value === "ship") {
         return value;
     }
     throw new Error(`Unsupported phase "${value ?? ""}".`);
@@ -31325,27 +31327,27 @@ function iosPlatform(result, context) {
     }
     return "ios";
 }
-function plannedPhase(result) {
+function pullRequestResultPhase(result) {
     const value = result.phase;
-    if (value === "noop" || value === "candidate" || value === "promote") {
+    if (value === "noop" || value === "release-candidate" || value === "ship") {
         return value;
     }
-    throw new Error('ship-my-flutter returned an invalid plan result: "phase" must be ' +
-        '"noop", "candidate", or "promote".');
+    throw new Error('ship-my-flutter returned an invalid pull-request result: "phase" must be ' +
+        '"noop", "release-candidate", or "ship".');
 }
-function mapPlanOutputs(result) {
-    const nextPhase = plannedPhase(result);
+function mapPullRequestOutputs(result) {
+    const nextPhase = pullRequestResultPhase(result);
     if (nextPhase === "noop") {
         setOutput("phase", nextPhase);
         return;
     }
-    const platform = iosPlatform(result, "plan");
-    const version = requiredString(result, "version", "plan");
+    const platform = iosPlatform(result, "pull-request");
+    const version = requiredString(result, "version", "pull-request");
     let branch;
     let pullRequestNumber;
-    if (nextPhase === "candidate") {
-        branch = requiredString(result, "branch", "plan");
-        pullRequestNumber = optionalPositiveInteger(result, "pullRequestNumber", "plan");
+    if (nextPhase === "release-candidate") {
+        branch = requiredString(result, "branch", "pull-request");
+        pullRequestNumber = optionalPositiveInteger(result, "pullRequestNumber", "pull-request");
     }
     setOutput("phase", nextPhase);
     setOutput("platform", platform);
@@ -31356,22 +31358,22 @@ function mapPlanOutputs(result) {
         setOutput("pull-request-number", String(pullRequestNumber));
     }
 }
-function mapCandidateOutputs(result) {
-    const platform = iosPlatform(result, "candidate");
-    const version = requiredString(result, "version", "candidate");
-    const buildId = requiredString(result, "buildId", "candidate");
-    const buildNumber = requiredString(result, "buildNumber", "candidate");
-    setOutput("phase", "candidate");
+function mapReleaseCandidateOutputs(result) {
+    const platform = iosPlatform(result, "release-candidate");
+    const version = requiredString(result, "version", "release-candidate");
+    const buildId = requiredString(result, "buildId", "release-candidate");
+    const buildNumber = requiredString(result, "buildNumber", "release-candidate");
+    setOutput("phase", "release-candidate");
     setOutput("platform", platform);
     setOutput("version", version);
     setOutput("build-id", buildId);
     setOutput("build-number", buildNumber);
 }
-function mapPromoteOutputs(result) {
-    const version = requiredString(result, "version", "promote");
-    const buildId = requiredString(result, "buildId", "promote");
-    const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "promote");
-    setOutput("phase", "promote");
+function mapShipOutputs(result) {
+    const version = requiredString(result, "version", "ship");
+    const buildId = requiredString(result, "buildId", "ship");
+    const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "ship");
+    setOutput("phase", "ship");
     setOutput("platform", "ios");
     setOutput("version", version);
     setOutput("build-id", buildId);
@@ -31379,21 +31381,21 @@ function mapPromoteOutputs(result) {
 }
 function mapOutputs(selected, result) {
     switch (selected) {
-        case "plan":
-            mapPlanOutputs(result);
+        case "pull-request":
+            mapPullRequestOutputs(result);
             return;
-        case "candidate":
-            mapCandidateOutputs(result);
+        case "release-candidate":
+            mapReleaseCandidateOutputs(result);
             return;
-        case "promote":
-            mapPromoteOutputs(result);
+        case "ship":
+            mapShipOutputs(result);
     }
 }
 async function run() {
     maskSensitiveInputs();
     const selected = phase();
-    if (selected === "candidate" && process.platform !== "darwin") {
-        throw new Error("The candidate phase requires a macOS runner.");
+    if (selected === "release-candidate" && process.platform !== "darwin") {
+        throw new Error("The release-candidate phase requires a macOS runner.");
     }
     const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
     const repositoryName = repository();
