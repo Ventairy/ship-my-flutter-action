@@ -11,7 +11,16 @@ _PromotionResult _$PromotionResultFromJson(Map<String, dynamic> json) =>
       final val = _PromotionResult(
         version: $checkedConvert('version', (v) => v as String),
         tag: $checkedConvert('tag', (v) => v as String),
-        buildId: $checkedConvert('buildId', (v) => v as String),
+        artifactId: $checkedConvert('artifactId', (v) => v as String),
+        buildNumber: $checkedConvert('buildNumber', (v) => v as String),
+        githubReleaseUrl: $checkedConvert(
+          'githubReleaseUrl',
+          (v) => v as String,
+        ),
+        platform: $checkedConvert(
+          'platform',
+          (v) => $enumDecodeNullable(_$PlatformEnumMap, v) ?? Platform.ios,
+        ),
         appStoreVersionId: $checkedConvert(
           'appStoreVersionId',
           (v) => v as String?,
@@ -19,10 +28,6 @@ _PromotionResult _$PromotionResultFromJson(Map<String, dynamic> json) =>
         reviewSubmissionId: $checkedConvert(
           'reviewSubmissionId',
           (v) => v as String?,
-        ),
-        githubReleaseUrl: $checkedConvert(
-          'githubReleaseUrl',
-          (v) => v as String,
         ),
       );
       return val;
@@ -32,8 +37,12 @@ Map<String, dynamic> _$PromotionResultToJson(_PromotionResult instance) =>
     <String, dynamic>{
       'version': instance.version,
       'tag': instance.tag,
-      'buildId': instance.buildId,
+      'artifactId': instance.artifactId,
+      'buildNumber': instance.buildNumber,
+      'githubReleaseUrl': instance.githubReleaseUrl,
+      'platform': _$PlatformEnumMap[instance.platform]!,
       'appStoreVersionId': ?instance.appStoreVersionId,
       'reviewSubmissionId': ?instance.reviewSubmissionId,
-      'githubReleaseUrl': instance.githubReleaseUrl,
     };
+
+const _$PlatformEnumMap = {Platform.ios: 'ios', Platform.android: 'android'};

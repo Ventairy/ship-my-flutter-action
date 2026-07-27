@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 type Phase = "pull-request" | "release-candidate" | "ship";
+type Platform = "ios" | "android";
 type JsonObject = Record<string, unknown>;
 type PullRequestResultPhase = "noop" | "release-candidate" | "ship";
 
@@ -16,6 +17,11 @@ const sensitiveEnvironmentNames = [
   "SMF_IOS_CERTIFICATE_BASE64",
   "SMF_IOS_CERTIFICATE_PASSWORD",
   "SMF_IOS_PROVISIONING_PROFILES_BASE64",
+  "SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64",
+  "SMF_ANDROID_KEYSTORE_BASE64",
+  "SMF_ANDROID_KEY_ALIAS",
+  "SMF_ANDROID_KEYSTORE_PASSWORD",
+  "SMF_ANDROID_KEY_PASSWORD",
 ] as const;
 
 function maskSensitiveInputs(): void {
@@ -48,6 +54,20 @@ function repository(): string {
     throw new Error("GitHub repository context is missing or invalid.");
   }
   return `${parts[0]}/${parts[1]}`;
+}
+
+function selectedPlatform(selected: Phase): Platform | undefined {
+  const value = process.env.INPUT_PLATFORM?.trim();
+  if (selected === "pull-request") {
+    if (value) {
+      throw new Error("platform must be omitted for the pull-request phase.");
+    }
+    return undefined;
+  }
+  if (value === "ios" || value === "android") return value;
+  throw new Error(
+    `platform must be "ios" or "android" for the ${selected} phase.`,
+  );
 }
 
 function smfPath(): string | undefined {
@@ -129,14 +149,14 @@ function optionalPositiveInteger(
   return value;
 }
 
-function iosPlatform(result: JsonObject, context: string): "ios" {
-  if (result.platform !== "ios") {
+function platform(result: JsonObject, context: string): Platform {
+  if (result.platform !== "ios" && result.platform !== "android") {
     throw new Error(
       `smf returned an invalid ${context} result: ` +
-        '"platform" must be "ios".',
+        '"platform" must be "ios" or "android".',
     );
   }
-  return "ios";
+  return result.platform;
 }
 
 function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
@@ -157,8 +177,7 @@ function mapPullRequestOutputs(result: JsonObject): void {
     return;
   }
 
-  const platform = iosPlatform(result, "pull-request");
-  const version = requiredString(result, "version", "pull-request");
+  const releases = releaseMatrix(result);
   let branch: string | undefined;
   let pullRequestNumber: number | undefined;
   if (nextPhase === "release-candidate") {
@@ -171,18 +190,53 @@ function mapPullRequestOutputs(result: JsonObject): void {
   }
 
   core.setOutput("phase", nextPhase);
-  core.setOutput("platform", platform);
-  core.setOutput("version", version);
+  core.setOutput("releases", JSON.stringify(releases));
+  if (releases.length === 1) {
+    core.setOutput("platform", releases[0]!.platform);
+    core.setOutput("version", releases[0]!.version);
+  }
   if (branch !== undefined) core.setOutput("branch", branch);
   if (pullRequestNumber !== undefined) {
     core.setOutput("pull-request-number", String(pullRequestNumber));
   }
 }
 
+function releaseMatrix(
+  result: JsonObject,
+): Array<{ platform: Platform; version: string }> {
+  if (!Array.isArray(result.releases) || result.releases.length === 0) {
+    throw new Error(
+      'smf returned an invalid pull-request result: "releases" must be a ' +
+        "non-empty list.",
+    );
+  }
+  const seen = new Set<Platform>();
+  return result.releases.map((value) => {
+    if (value === null || Array.isArray(value) || typeof value !== "object") {
+      throw new Error(
+        "smf returned an invalid pull-request result: each release must be " +
+          "an object.",
+      );
+    }
+    const release = value as JsonObject;
+    const releasePlatform = platform(release, "pull-request release");
+    if (seen.has(releasePlatform)) {
+      throw new Error(
+        `smf returned duplicate ${releasePlatform} release targets.`,
+      );
+    }
+    seen.add(releasePlatform);
+    return {
+      platform: releasePlatform,
+      version: requiredString(release, "version", "pull-request release"),
+    };
+  });
+}
+
 function mapReleaseCandidateOutputs(result: JsonObject): void {
-  const platform = iosPlatform(result, "release-candidate");
+  const selected = platform(result, "release-candidate");
   const version = requiredString(result, "version", "release-candidate");
-  const buildId = requiredString(result, "buildId", "release-candidate");
+  const artifactId = requiredString(result, "artifactId", "release-candidate");
   const buildNumber = requiredString(
     result,
     "buildNumber",
@@ -190,21 +244,24 @@ function mapReleaseCandidateOutputs(result: JsonObject): void {
   );
 
   core.setOutput("phase", "release-candidate");
-  core.setOutput("platform", platform);
+  core.setOutput("platform", selected);
   core.setOutput("version", version);
-  core.setOutput("build-id", buildId);
+  core.setOutput("artifact-id", artifactId);
   core.setOutput("build-number", buildNumber);
 }
 
 function mapShipOutputs(result: JsonObject): void {
+  const selected = platform(result, "ship");
   const version = requiredString(result, "version", "ship");
-  const buildId = requiredString(result, "buildId", "ship");
+  const artifactId = requiredString(result, "artifactId", "ship");
+  const buildNumber = requiredString(result, "buildNumber", "ship");
   const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "ship");
 
   core.setOutput("phase", "ship");
-  core.setOutput("platform", "ios");
+  core.setOutput("platform", selected);
   core.setOutput("version", version);
-  core.setOutput("build-id", buildId);
+  core.setOutput("artifact-id", artifactId);
+  core.setOutput("build-number", buildNumber);
   core.setOutput("release-url", githubReleaseUrl);
 }
 
@@ -224,8 +281,13 @@ function mapOutputs(selected: Phase, result: JsonObject): void {
 export async function run(): Promise<void> {
   maskSensitiveInputs();
   const selected = phase();
-  if (selected === "release-candidate" && process.platform !== "darwin") {
-    throw new Error("The release-candidate phase requires a macOS runner.");
+  const targetPlatform = selectedPlatform(selected);
+  if (
+    selected === "release-candidate" &&
+    targetPlatform === "ios" &&
+    process.platform !== "darwin"
+  ) {
+    throw new Error("An iOS release candidate requires a macOS runner.");
   }
   const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const repositoryName = repository();
@@ -248,6 +310,9 @@ export async function run(): Promise<void> {
   ];
   if (selectedSmfPath !== undefined) {
     arguments_.push("--smf-path", selectedSmfPath);
+  }
+  if (targetPlatform !== undefined) {
+    arguments_.push("--platform", targetPlatform);
   }
   const result = await exec.getExecOutput(executable, arguments_, {
     cwd: runtimeDirectory(),

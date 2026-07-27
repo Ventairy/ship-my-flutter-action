@@ -31234,6 +31234,11 @@ const sensitiveEnvironmentNames = [
     "SMF_IOS_CERTIFICATE_BASE64",
     "SMF_IOS_CERTIFICATE_PASSWORD",
     "SMF_IOS_PROVISIONING_PROFILES_BASE64",
+    "SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64",
+    "SMF_ANDROID_KEYSTORE_BASE64",
+    "SMF_ANDROID_KEY_ALIAS",
+    "SMF_ANDROID_KEYSTORE_PASSWORD",
+    "SMF_ANDROID_KEY_PASSWORD",
 ];
 function maskSensitiveInputs() {
     for (const name of sensitiveEnvironmentNames) {
@@ -31260,6 +31265,18 @@ function repository() {
         throw new Error("GitHub repository context is missing or invalid.");
     }
     return `${parts[0]}/${parts[1]}`;
+}
+function selectedPlatform(selected) {
+    const value = process.env.INPUT_PLATFORM?.trim();
+    if (selected === "pull-request") {
+        if (value) {
+            throw new Error("platform must be omitted for the pull-request phase.");
+        }
+        return undefined;
+    }
+    if (value === "ios" || value === "android")
+        return value;
+    throw new Error(`platform must be "ios" or "android" for the ${selected} phase.`);
 }
 function smfPath() {
     const value = process.env.INPUT_SMF_PATH?.trim();
@@ -31324,12 +31341,12 @@ function optionalPositiveInteger(result, name, context) {
     }
     return value;
 }
-function iosPlatform(result, context) {
-    if (result.platform !== "ios") {
+function main_platform(result, context) {
+    if (result.platform !== "ios" && result.platform !== "android") {
         throw new Error(`smf returned an invalid ${context} result: ` +
-            '"platform" must be "ios".');
+            '"platform" must be "ios" or "android".');
     }
-    return "ios";
+    return result.platform;
 }
 function pullRequestResultPhase(result) {
     const value = result.phase;
@@ -31345,8 +31362,7 @@ function mapPullRequestOutputs(result) {
         setOutput("phase", nextPhase);
         return;
     }
-    const platform = iosPlatform(result, "pull-request");
-    const version = requiredString(result, "version", "pull-request");
+    const releases = releaseMatrix(result);
     let branch;
     let pullRequestNumber;
     if (nextPhase === "release-candidate") {
@@ -31354,33 +31370,62 @@ function mapPullRequestOutputs(result) {
         pullRequestNumber = optionalPositiveInteger(result, "pullRequestNumber", "pull-request");
     }
     setOutput("phase", nextPhase);
-    setOutput("platform", platform);
-    setOutput("version", version);
+    setOutput("releases", JSON.stringify(releases));
+    if (releases.length === 1) {
+        setOutput("platform", releases[0].platform);
+        setOutput("version", releases[0].version);
+    }
     if (branch !== undefined)
         setOutput("branch", branch);
     if (pullRequestNumber !== undefined) {
         setOutput("pull-request-number", String(pullRequestNumber));
     }
 }
+function releaseMatrix(result) {
+    if (!Array.isArray(result.releases) || result.releases.length === 0) {
+        throw new Error('smf returned an invalid pull-request result: "releases" must be a ' +
+            "non-empty list.");
+    }
+    const seen = new Set();
+    return result.releases.map((value) => {
+        if (value === null || Array.isArray(value) || typeof value !== "object") {
+            throw new Error("smf returned an invalid pull-request result: each release must be " +
+                "an object.");
+        }
+        const release = value;
+        const releasePlatform = main_platform(release, "pull-request release");
+        if (seen.has(releasePlatform)) {
+            throw new Error(`smf returned duplicate ${releasePlatform} release targets.`);
+        }
+        seen.add(releasePlatform);
+        return {
+            platform: releasePlatform,
+            version: requiredString(release, "version", "pull-request release"),
+        };
+    });
+}
 function mapReleaseCandidateOutputs(result) {
-    const platform = iosPlatform(result, "release-candidate");
+    const selected = main_platform(result, "release-candidate");
     const version = requiredString(result, "version", "release-candidate");
-    const buildId = requiredString(result, "buildId", "release-candidate");
+    const artifactId = requiredString(result, "artifactId", "release-candidate");
     const buildNumber = requiredString(result, "buildNumber", "release-candidate");
     setOutput("phase", "release-candidate");
-    setOutput("platform", platform);
+    setOutput("platform", selected);
     setOutput("version", version);
-    setOutput("build-id", buildId);
+    setOutput("artifact-id", artifactId);
     setOutput("build-number", buildNumber);
 }
 function mapShipOutputs(result) {
+    const selected = main_platform(result, "ship");
     const version = requiredString(result, "version", "ship");
-    const buildId = requiredString(result, "buildId", "ship");
+    const artifactId = requiredString(result, "artifactId", "ship");
+    const buildNumber = requiredString(result, "buildNumber", "ship");
     const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "ship");
     setOutput("phase", "ship");
-    setOutput("platform", "ios");
+    setOutput("platform", selected);
     setOutput("version", version);
-    setOutput("build-id", buildId);
+    setOutput("artifact-id", artifactId);
+    setOutput("build-number", buildNumber);
     setOutput("release-url", githubReleaseUrl);
 }
 function mapOutputs(selected, result) {
@@ -31398,8 +31443,11 @@ function mapOutputs(selected, result) {
 async function run() {
     maskSensitiveInputs();
     const selected = phase();
-    if (selected === "release-candidate" && process.platform !== "darwin") {
-        throw new Error("The release-candidate phase requires a macOS runner.");
+    const targetPlatform = selectedPlatform(selected);
+    if (selected === "release-candidate" &&
+        targetPlatform === "ios" &&
+        process.platform !== "darwin") {
+        throw new Error("An iOS release candidate requires a macOS runner.");
     }
     const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
     const repositoryName = repository();
@@ -31423,6 +31471,9 @@ async function run() {
     ];
     if (selectedSmfPath !== undefined) {
         arguments_.push("--smf-path", selectedSmfPath);
+    }
+    if (targetPlatform !== undefined) {
+        arguments_.push("--platform", targetPlatform);
     }
     const result = await getExecOutput(executable, arguments_, {
         cwd: runtimeDirectory(),

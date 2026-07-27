@@ -1,7 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-
-import '../models/release_enums.dart';
-import 'changelog_release.dart';
+import 'package:smf_engine/src/dtos/changelog_release.dart';
+import 'package:smf_engine/src/models/release_enums.dart';
 
 part 'changelog_manifest.freezed.dart';
 
@@ -10,8 +9,10 @@ part 'changelog_manifest.freezed.dart';
 abstract class ChangelogManifest with _$ChangelogManifest {
   /// Creates changelog state.
   const factory ChangelogManifest({
-    @Default(1) int schemaVersion,
     required Map<String, ChangelogRelease> iosReleases,
+    @Default(<String, ChangelogRelease>{})
+    Map<String, ChangelogRelease> androidReleases,
+    @Default(1) int schemaVersion,
   }) = _ChangelogManifest;
 
   const ChangelogManifest._();
@@ -20,6 +21,7 @@ abstract class ChangelogManifest with _$ChangelogManifest {
   Map<String, ChangelogRelease> releasesFor(Platform platform) =>
       switch (platform) {
         Platform.ios => iosReleases,
+        Platform.android => androidReleases,
       };
 
   /// Encodes the stable changelog wire format.
@@ -28,8 +30,12 @@ abstract class ChangelogManifest with _$ChangelogManifest {
     'platforms': <String, Object?>{
       'ios': <String, Object?>{
         'releases': iosReleases.map(
-          (String key, ChangelogRelease value) =>
-              MapEntry<String, Object?>(key, value.toJson()),
+          (key, value) => MapEntry<String, Object?>(key, value.toJson()),
+        ),
+      },
+      'android': <String, Object?>{
+        'releases': androidReleases.map(
+          (key, value) => MapEntry<String, Object?>(key, value.toJson()),
         ),
       },
     },

@@ -1,4 +1,4 @@
-import 'model.dart';
+import 'package:smf_engine/src/model.dart';
 
 const Map<String, String> _sectionNames = <String, String>{
   'feat': 'Features',
@@ -25,29 +25,42 @@ String releaseNotesMarkdown(Platform platform, ChangelogRelease release) {
   }
   final sections = grouped.entries
       .map(
-        (MapEntry<String, List<ConventionalChange>> entry) =>
+        (entry) =>
             '## ${entry.key}\n\n'
             '${entry.value.map(formatChange).join('\n')}',
       )
       .join('\n\n');
-  final platformName = platform == Platform.ios ? 'iOS' : platform.value;
-  return '# $platformName ${release.version}\n\n$sections\n';
+  return '# ${platform.displayName} ${release.version}\n\n$sections\n';
 }
 
 String releasePullRequestBody(Platform platform, ChangelogRelease release) {
-  final notes = releaseNotesMarkdown(platform, release);
+  return combinedReleasePullRequestBody(<Platform, ChangelogRelease>{
+    platform: release,
+  });
+}
+
+/// Builds one pull-request body for every platform release in the branch.
+String combinedReleasePullRequestBody(
+  Map<Platform, ChangelogRelease> releases,
+) {
+  final notes = releases.entries
+      .map((entry) => releaseNotesMarkdown(entry.key, entry.value).trim())
+      .join('\n\n---\n\n');
+  final checklist = <String>[
+    for (final platform in releases.keys)
+      '- [ ] ${platform.displayName} candidate receipt is committed and tested',
+  ];
   const deliveryMessage =
-      'Merging this PR promotes the exact committed TestFlight candidate. If '
-      'build inputs change after the candidate is uploaded, smf '
-      'refuses promotion until a new candidate is produced.';
+      'Merging this PR promotes each exact committed store candidate. If build '
+      'inputs change after a candidate is uploaded, smf refuses that platform '
+      'promotion until a new candidate is produced.';
   return <String>[
     '<!-- smf:release-pr -->',
-    notes.trim(),
+    notes,
     '',
     '## Delivery',
     '',
-    '- [ ] The TestFlight candidate receipt is committed',
-    '- [ ] The candidate has been tested',
+    ...checklist,
     '- [ ] Store release notes have been reviewed',
     '',
     deliveryMessage,

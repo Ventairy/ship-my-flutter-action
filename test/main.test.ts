@@ -37,9 +37,8 @@ describe("action adapter", () => {
       stderr: "",
       stdout: JSON.stringify({
         phase: "release-candidate",
-        platform: "ios",
-        version: "1.2.0",
-        branch: "smf/ios",
+        releases: [{ platform: "ios", version: "1.2.0" }],
+        branch: "smf/release",
         pullRequestNumber: 12,
       }),
     });
@@ -68,6 +67,10 @@ describe("action adapter", () => {
       }),
     );
     expect(setOutput).toHaveBeenCalledWith("phase", "release-candidate");
+    expect(setOutput).toHaveBeenCalledWith(
+      "releases",
+      JSON.stringify([{ platform: "ios", version: "1.2.0" }]),
+    );
     expect(setOutput).toHaveBeenCalledWith("pull-request-number", "12");
     expect(setSecret).toHaveBeenCalledWith("token");
     expect(process.env.INPUT_GITHUB_TOKEN).toBeUndefined();
@@ -94,6 +97,7 @@ describe("action adapter", () => {
   it("rejects release-candidate builds on a non-macOS runner", async () => {
     vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     process.env.INPUT_PHASE = "release-candidate";
+    process.env.INPUT_PLATFORM = "ios";
 
     await expect(run()).rejects.toThrow(/macOS runner/);
     expect(getExecOutput).not.toHaveBeenCalled();
@@ -102,13 +106,14 @@ describe("action adapter", () => {
   it("maps a complete release-candidate result on macOS", async () => {
     vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
     process.env.INPUT_PHASE = "release-candidate";
+    process.env.INPUT_PLATFORM = "ios";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
         platform: "ios",
         version: "1.2.0",
-        buildId: "build-7",
+        artifactId: "build-7",
         buildNumber: "7",
       }),
     });
@@ -116,18 +121,46 @@ describe("action adapter", () => {
     await run();
 
     expect(setOutput).toHaveBeenCalledWith("phase", "release-candidate");
-    expect(setOutput).toHaveBeenCalledWith("build-id", "build-7");
+    expect(setOutput).toHaveBeenCalledWith("artifact-id", "build-7");
     expect(setOutput).toHaveBeenCalledWith("build-number", "7");
   });
 
-  it("maps ship results without implementing shipping logic", async () => {
-    process.env.INPUT_PHASE = "ship";
+  it("runs Android release candidates on Linux", async () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+    process.env.INPUT_PHASE = "release-candidate";
+    process.env.INPUT_PLATFORM = "android";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
+        platform: "android",
+        version: "1.2.0",
+        artifactId: "42",
+        buildNumber: "42",
+      }),
+    });
+
+    await run();
+
+    expect(getExecOutput).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining(["--platform", "android"]),
+      expect.anything(),
+    );
+    expect(setOutput).toHaveBeenCalledWith("artifact-id", "42");
+  });
+
+  it("maps ship results without implementing shipping logic", async () => {
+    process.env.INPUT_PHASE = "ship";
+    process.env.INPUT_PLATFORM = "ios";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        platform: "ios",
         version: "2.0.0",
-        buildId: "build-42",
+        artifactId: "build-42",
+        buildNumber: "42",
         githubReleaseUrl:
           "https://github.com/ventairy/example/releases/ios-v2.0.0",
       }),
@@ -136,7 +169,7 @@ describe("action adapter", () => {
     await run();
 
     expect(setOutput).toHaveBeenCalledWith("phase", "ship");
-    expect(setOutput).toHaveBeenCalledWith("build-id", "build-42");
+    expect(setOutput).toHaveBeenCalledWith("artifact-id", "build-42");
     expect(setOutput).toHaveBeenCalledWith(
       "release-url",
       "https://github.com/ventairy/example/releases/ios-v2.0.0",
@@ -164,8 +197,7 @@ describe("action adapter", () => {
       stderr: "",
       stdout: JSON.stringify({
         phase: "ship",
-        platform: "ios",
-        version: "2.0.0",
+        releases: [{ platform: "ios", version: "2.0.0" }],
       }),
     });
 
@@ -198,8 +230,7 @@ describe("action adapter", () => {
       stderr: "",
       stdout: JSON.stringify({
         phase: "release-candidate",
-        platform: "ios",
-        version: "1.2.0",
+        releases: [{ platform: "ios", version: "1.2.0" }],
       }),
     });
 
@@ -215,9 +246,8 @@ describe("action adapter", () => {
       stderr: "",
       stdout: JSON.stringify({
         phase: "release-candidate",
-        platform: "ios",
-        version: "1.2.0",
-        branch: "smf/ios",
+        releases: [{ platform: "ios", version: "1.2.0" }],
+        branch: "smf/release",
         pullRequestNumber: "12",
       }),
     });
@@ -230,6 +260,7 @@ describe("action adapter", () => {
   it("rejects an incomplete direct release-candidate result", async () => {
     vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
     process.env.INPUT_PHASE = "release-candidate";
+    process.env.INPUT_PLATFORM = "ios";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
@@ -241,33 +272,37 @@ describe("action adapter", () => {
     });
 
     await expect(run()).rejects.toThrow(
-      'invalid release-candidate result: "buildId" must be a non-empty string',
+      'invalid release-candidate result: "artifactId" must be a non-empty string',
     );
   });
 
-  it("rejects a non-iOS platform result", async () => {
+  it("rejects an unsupported platform result", async () => {
     process.env.INPUT_PHASE = "pull-request";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
         phase: "ship",
-        platform: "android",
-        version: "2.0.0",
+        releases: [{ platform: "web", version: "2.0.0" }],
       }),
     });
 
-    await expect(run()).rejects.toThrow('"platform" must be "ios"');
+    await expect(run()).rejects.toThrow(
+      '"platform" must be "ios" or "android"',
+    );
   });
 
   it("rejects an incomplete ship result", async () => {
     process.env.INPUT_PHASE = "ship";
+    process.env.INPUT_PLATFORM = "android";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
+        platform: "android",
         version: "2.0.0",
-        buildId: "build-42",
+        artifactId: "42",
+        buildNumber: "42",
       }),
     });
 
@@ -352,6 +387,7 @@ describe("action adapter", () => {
   it("masks every supplied release credential before execution", async () => {
     process.env.INPUT_PHASE = "pull-request";
     process.env.SMF_IOS_CERTIFICATE_PASSWORD = "p12-password";
+    process.env.SMF_ANDROID_KEYSTORE_PASSWORD = "keystore-password";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
@@ -362,6 +398,7 @@ describe("action adapter", () => {
 
     expect(setSecret).toHaveBeenCalledWith("token");
     expect(setSecret).toHaveBeenCalledWith("p12-password");
+    expect(setSecret).toHaveBeenCalledWith("keystore-password");
   });
 
   it("rejects unknown phases before launching Dart", async () => {

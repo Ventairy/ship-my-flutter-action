@@ -1,0 +1,75 @@
+name: Resolve SMF project
+description: Resolve the selected Flutter app and its FVM configuration.
+
+inputs:
+  smf-path:
+    description: App-owned smf directory.
+    required: true
+
+outputs:
+  app-path:
+    description: Flutter app directory.
+    value: ${{ steps.resolve.outputs.app-path }}
+  uses-fvm:
+    description: Whether the app inherits an FVM configuration.
+    value: ${{ steps.resolve.outputs.uses-fvm }}
+  fvm-root:
+    description: Directory owning the inherited FVM configuration.
+    value: ${{ steps.resolve.outputs.fvm-root }}
+  has-before-create-hook:
+    description: Whether before_create_pr.dart exists.
+    value: ${{ steps.resolve.outputs.has-before-create-hook }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        INPUT_SMF_PATH: ${{ inputs.smf-path }}
+      run: |
+        if [[ "$INPUT_SMF_PATH" == *$'\n'* || "$INPUT_SMF_PATH" == *$'\r'* ]]; then
+          echo "smf-path cannot contain a newline." >&2
+          exit 1
+        fi
+        if [[ "$INPUT_SMF_PATH" == /* || "$INPUT_SMF_PATH" == ".." || "$INPUT_SMF_PATH" == ../* || "$INPUT_SMF_PATH" == */../* || "$INPUT_SMF_PATH" == */.. ]]; then
+          echo "smf-path must stay inside the repository." >&2
+          exit 1
+        fi
+        if [[ "$INPUT_SMF_PATH" != "smf" && "$INPUT_SMF_PATH" != */smf ]]; then
+          echo "smf-path must point directly to an smf directory." >&2
+          exit 1
+        fi
+        if [[ ! -f "$INPUT_SMF_PATH/config.yaml" ]]; then
+          echo "$INPUT_SMF_PATH/config.yaml does not exist." >&2
+          exit 1
+        fi
+        app_dir="${INPUT_SMF_PATH%/smf}"
+        app_dir="${app_dir%/}"
+        if [[ -z "$app_dir" ]]; then
+          app_dir="."
+        fi
+        search_dir="$app_dir"
+        uses_fvm=false
+        fvm_root=
+        while true; do
+          if [[ -f "$search_dir/.fvmrc" || -f "$search_dir/.fvm/fvm_config.json" ]]; then
+            uses_fvm=true
+            fvm_root="$search_dir"
+            break
+          fi
+          if [[ "$search_dir" == "." ]]; then
+            break
+          fi
+          search_dir="$(dirname "$search_dir")"
+        done
+        has_hook=false
+        if [[ -f "$INPUT_SMF_PATH/hooks/before_create_pr.dart" ]]; then
+          has_hook=true
+        fi
+        {
+          echo "app-path=$app_dir"
+          echo "uses-fvm=$uses_fvm"
+          echo "fvm-root=$fvm_root"
+          echo "has-before-create-hook=$has_hook"
+        } >> "$GITHUB_OUTPUT"

@@ -11,7 +11,13 @@ const actionRoot = path.resolve(
 );
 const workspaceRoot = path.resolve(actionRoot, "..", "smf");
 const destination = path.join(actionRoot, "vendor", "smf");
-const packages = ["smf_hooks", "smf_engine", "smf_apple", "smf_cli"];
+const packages = [
+  "smf_hooks",
+  "smf_engine",
+  "smf_apple",
+  "smf_android",
+  "smf_cli",
+];
 
 const [{ stdout: smfCommit }, { stdout: smfStatus }] = await Promise.all([
   execFileAsync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot }),

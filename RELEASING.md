@@ -36,8 +36,8 @@ revocation as repository administration.
 6. Release Please creates `vX.Y.Z` and its GitHub Release, then moves the `vX`
    and `vX.Y` compatibility tags to the same tested commit.
 
-The first stable release must remain unmerged until the live Apple acceptance
-test succeeds. When that gate is complete, include this footer in a
+The first stable release must remain unmerged until the live Apple and Google
+Play acceptance tests succeed. When those gates are complete, include this footer in a
 Conventional Commit if the open release PR does not already target `1.0.0`:
 
 ```text
@@ -46,9 +46,11 @@ Release-As: 1.0.0
 
 Before merging the first stable release PR:
 
-- confirm the Action CI and public non-Apple fixture are green;
+- confirm the Action CI and public fixture are green;
 - exercise signing, upload, receipt recording, and exact-build promotion with
   real Apple credentials;
+- exercise upload-key signing, internal-testing upload, receipt recording, and
+  same-`versionCode` production promotion with real Google Play credentials;
 - remove the README pre-release warning;
 - verify `dist` and `vendor/smf` match their reviewed sources;
 - confirm the generated tag is `v1.0.0`.

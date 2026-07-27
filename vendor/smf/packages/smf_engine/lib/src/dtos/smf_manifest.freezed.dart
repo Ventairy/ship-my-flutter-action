@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$SmfManifest {
 
- int get schemaVersion; PlatformManifest get ios;
+ PlatformManifest get ios; PlatformManifest get android; int get schemaVersion;
 /// Create a copy of SmfManifest
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $SmfManifestCopyWith<SmfManifest> get copyWith => _$SmfManifestCopyWithImpl<SmfM
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SmfManifest&&(identical(other.schemaVersion, schemaVersion) || other.schemaVersion == schemaVersion)&&(identical(other.ios, ios) || other.ios == ios));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SmfManifest&&(identical(other.ios, ios) || other.ios == ios)&&(identical(other.android, android) || other.android == android)&&(identical(other.schemaVersion, schemaVersion) || other.schemaVersion == schemaVersion));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,schemaVersion,ios);
+int get hashCode => Object.hash(runtimeType,ios,android,schemaVersion);
 
 @override
 String toString() {
-  return 'SmfManifest(schemaVersion: $schemaVersion, ios: $ios)';
+  return 'SmfManifest(ios: $ios, android: $android, schemaVersion: $schemaVersion)';
 }
 
 
@@ -45,11 +45,11 @@ abstract mixin class $SmfManifestCopyWith<$Res>  {
   factory $SmfManifestCopyWith(SmfManifest value, $Res Function(SmfManifest) _then) = _$SmfManifestCopyWithImpl;
 @useResult
 $Res call({
- int schemaVersion, PlatformManifest ios
+ PlatformManifest ios, PlatformManifest android, int schemaVersion
 });
 
 
-$PlatformManifestCopyWith<$Res> get ios;
+$PlatformManifestCopyWith<$Res> get ios;$PlatformManifestCopyWith<$Res> get android;
 
 }
 /// @nodoc
@@ -62,11 +62,12 @@ class _$SmfManifestCopyWithImpl<$Res>
 
 /// Create a copy of SmfManifest
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? schemaVersion = null,Object? ios = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? ios = null,Object? android = null,Object? schemaVersion = null,}) {
   return _then(_self.copyWith(
-schemaVersion: null == schemaVersion ? _self.schemaVersion : schemaVersion // ignore: cast_nullable_to_non_nullable
-as int,ios: null == ios ? _self.ios : ios // ignore: cast_nullable_to_non_nullable
-as PlatformManifest,
+ios: null == ios ? _self.ios : ios // ignore: cast_nullable_to_non_nullable
+as PlatformManifest,android: null == android ? _self.android : android // ignore: cast_nullable_to_non_nullable
+as PlatformManifest,schemaVersion: null == schemaVersion ? _self.schemaVersion : schemaVersion // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 /// Create a copy of SmfManifest
@@ -77,6 +78,15 @@ $PlatformManifestCopyWith<$Res> get ios {
   
   return $PlatformManifestCopyWith<$Res>(_self.ios, (value) {
     return _then(_self.copyWith(ios: value));
+  });
+}/// Create a copy of SmfManifest
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$PlatformManifestCopyWith<$Res> get android {
+  
+  return $PlatformManifestCopyWith<$Res>(_self.android, (value) {
+    return _then(_self.copyWith(android: value));
   });
 }
 }
@@ -160,10 +170,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int schemaVersion,  PlatformManifest ios)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( PlatformManifest ios,  PlatformManifest android,  int schemaVersion)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SmfManifest() when $default != null:
-return $default(_that.schemaVersion,_that.ios);case _:
+return $default(_that.ios,_that.android,_that.schemaVersion);case _:
   return orElse();
 
 }
@@ -181,10 +191,10 @@ return $default(_that.schemaVersion,_that.ios);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int schemaVersion,  PlatformManifest ios)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( PlatformManifest ios,  PlatformManifest android,  int schemaVersion)  $default,) {final _that = this;
 switch (_that) {
 case _SmfManifest():
-return $default(_that.schemaVersion,_that.ios);case _:
+return $default(_that.ios,_that.android,_that.schemaVersion);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -201,10 +211,10 @@ return $default(_that.schemaVersion,_that.ios);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int schemaVersion,  PlatformManifest ios)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( PlatformManifest ios,  PlatformManifest android,  int schemaVersion)?  $default,) {final _that = this;
 switch (_that) {
 case _SmfManifest() when $default != null:
-return $default(_that.schemaVersion,_that.ios);case _:
+return $default(_that.ios,_that.android,_that.schemaVersion);case _:
   return null;
 
 }
@@ -216,11 +226,12 @@ return $default(_that.schemaVersion,_that.ios);case _:
 
 
 class _SmfManifest extends SmfManifest {
-  const _SmfManifest({this.schemaVersion = 1, required this.ios}): super._();
+  const _SmfManifest({required this.ios, this.android = const PlatformManifest(version: '0.0.0', baselineSha: '0000000000000000000000000000000000000000', pendingRelease: false), this.schemaVersion = 1}): super._();
   
 
-@override@JsonKey() final  int schemaVersion;
 @override final  PlatformManifest ios;
+@override@JsonKey() final  PlatformManifest android;
+@override@JsonKey() final  int schemaVersion;
 
 /// Create a copy of SmfManifest
 /// with the given fields replaced by the non-null parameter values.
@@ -232,16 +243,16 @@ _$SmfManifestCopyWith<_SmfManifest> get copyWith => __$SmfManifestCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SmfManifest&&(identical(other.schemaVersion, schemaVersion) || other.schemaVersion == schemaVersion)&&(identical(other.ios, ios) || other.ios == ios));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SmfManifest&&(identical(other.ios, ios) || other.ios == ios)&&(identical(other.android, android) || other.android == android)&&(identical(other.schemaVersion, schemaVersion) || other.schemaVersion == schemaVersion));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,schemaVersion,ios);
+int get hashCode => Object.hash(runtimeType,ios,android,schemaVersion);
 
 @override
 String toString() {
-  return 'SmfManifest(schemaVersion: $schemaVersion, ios: $ios)';
+  return 'SmfManifest(ios: $ios, android: $android, schemaVersion: $schemaVersion)';
 }
 
 
@@ -252,11 +263,11 @@ abstract mixin class _$SmfManifestCopyWith<$Res> implements $SmfManifestCopyWith
   factory _$SmfManifestCopyWith(_SmfManifest value, $Res Function(_SmfManifest) _then) = __$SmfManifestCopyWithImpl;
 @override @useResult
 $Res call({
- int schemaVersion, PlatformManifest ios
+ PlatformManifest ios, PlatformManifest android, int schemaVersion
 });
 
 
-@override $PlatformManifestCopyWith<$Res> get ios;
+@override $PlatformManifestCopyWith<$Res> get ios;@override $PlatformManifestCopyWith<$Res> get android;
 
 }
 /// @nodoc
@@ -269,11 +280,12 @@ class __$SmfManifestCopyWithImpl<$Res>
 
 /// Create a copy of SmfManifest
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? schemaVersion = null,Object? ios = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? ios = null,Object? android = null,Object? schemaVersion = null,}) {
   return _then(_SmfManifest(
-schemaVersion: null == schemaVersion ? _self.schemaVersion : schemaVersion // ignore: cast_nullable_to_non_nullable
-as int,ios: null == ios ? _self.ios : ios // ignore: cast_nullable_to_non_nullable
-as PlatformManifest,
+ios: null == ios ? _self.ios : ios // ignore: cast_nullable_to_non_nullable
+as PlatformManifest,android: null == android ? _self.android : android // ignore: cast_nullable_to_non_nullable
+as PlatformManifest,schemaVersion: null == schemaVersion ? _self.schemaVersion : schemaVersion // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 
@@ -285,6 +297,15 @@ $PlatformManifestCopyWith<$Res> get ios {
   
   return $PlatformManifestCopyWith<$Res>(_self.ios, (value) {
     return _then(_self.copyWith(ios: value));
+  });
+}/// Create a copy of SmfManifest
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$PlatformManifestCopyWith<$Res> get android {
+  
+  return $PlatformManifestCopyWith<$Res>(_self.android, (value) {
+    return _then(_self.copyWith(android: value));
   });
 }
 }

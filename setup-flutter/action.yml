@@ -1,0 +1,43 @@
+name: Set up consumer Flutter
+description: Install the Flutter SDK selected by the consumer repository.
+
+inputs:
+  app-path:
+    description: Selected Flutter app directory.
+    required: true
+  uses-fvm:
+    description: Whether an inherited FVM configuration exists.
+    required: true
+  fvm-root:
+    description: Directory owning the inherited FVM configuration.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.uses-fvm == 'true'
+      uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
+      with:
+        sdk: 3.10.0
+    - if: inputs.uses-fvm == 'true'
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/fvm/versions
+        key: fvm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/.fvmrc', inputs.fvm-root), format('{0}/.fvm/fvm_config.json', inputs.fvm-root)) }}
+    - if: inputs.uses-fvm == 'true'
+      shell: bash
+      env:
+        FVM_ROOT: ${{ inputs.fvm-root }}
+      run: |
+        if [[ -z "$FVM_ROOT" || ! -d "$FVM_ROOT" ]]; then
+          echo "The inherited FVM root is missing." >&2
+          exit 1
+        fi
+        dart pub global activate fvm 4.1.2
+        (cd "$FVM_ROOT" && fvm install)
+    - if: inputs.uses-fvm != 'true'
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      with:
+        channel: stable
+        cache: true
+        pub-cache: true

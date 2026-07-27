@@ -2,228 +2,119 @@
 
 [![CI](https://github.com/Ventairy/smf-action/actions/workflows/ci.yml/badge.svg)](https://github.com/Ventairy/smf-action/actions/workflows/ci.yml)
 
-The official GitHub Action for [smf](https://github.com/Ventairy/smf).
+The official GitHub Action for [SMF](https://github.com/Ventairy/smf).
+
+It runs one shared Flutter release PR with independent iOS and Android
+candidates:
+
+- `pull-request` plans every pending platform and maintains `smf/release`;
+- `release-candidate` builds/uploads one selected platform candidate;
+- `ship` verifies and delivers that same store artifact after merge.
 
 > [!WARNING]
-> This action is in pre-release validation and has no `v1` tag yet. The public
-> integration fixture is pinned to an exact tested commit; production `@v1`
-> publication remains tracked in
-> [action issue #1](https://github.com/Ventairy/smf-action/issues/1)
-> after the live Apple acceptance gate. Examples below describe the intended
-> stable interface. Non-Apple action behavior is exercised publicly in
-> [`Ventairy/smf-e2e`](https://github.com/Ventairy/smf-e2e).
+> The Action is in pre-release validation and has no `v1` tag yet. The
+> interface below describes the intended stable release.
 
-It exposes the full release lifecycle through one action:
+## Start with the generated workflow
 
-- `pull-request` opens or updates the platform release PR;
-- `release-candidate` builds, signs, uploads, and records the exact TestFlight build;
-- `ship` verifies that recorded build after merge, optionally submits it
-  when configured, and completes the platform GitHub Release.
-
-## Start here
-
-The generated workflow from `smf init` is the supported starting point. Do not
-assemble a release workflow from the abbreviated Action calls below.
-
-Follow the canonical SMF guides:
-
-- [Getting started](https://github.com/Ventairy/smf/blob/main/doc/getting-started.md)
-- [Apple and App Store Connect setup](https://github.com/Ventairy/smf/blob/main/doc/apple-bootstrap.md)
-- [Configuration](https://github.com/Ventairy/smf/blob/main/doc/configuration.md)
-- [Release operation and recovery](https://github.com/Ventairy/smf/blob/main/doc/operations.md)
-- [Security](https://github.com/Ventairy/smf/blob/main/doc/security.md)
-
-The complete user manual and recommended reading order live in the
-[SMF user guide](https://github.com/Ventairy/smf/tree/main/doc).
-
-## Generate the workflow
-
-Run the initializer from the Flutter app directory:
+Do not assemble a workflow from isolated Action snippets. Install the CLI and
+run initialization from the Flutter app:
 
 ```bash
 dart install smf_cli
 smf init \
-  --current-version <current-ios-version> \
-  --bundle-id com.example.myapp
+  --current-version 1.0.0 \
+  --bundle-id com.example.myapp \
+  --package-name com.example.myapp
 ```
 
-`--current-version` is the stable iOS version SMF should treat as already
-released, not the next version you want to ship. For an existing store app,
-this is normally the latest shipped marketing version. For a never-released
-app, use `0.0.0` and add `Release-As-ios: 1.0.0` to the first qualifying
-Conventional Commit.
+Then follow the definitive [SMF user guide](https://github.com/Ventairy/smf/tree/main/doc):
 
-The generated `smf/config.yaml` includes a JSON Schema directive
-for editor validation and autocomplete. The initializer also writes the
-complete multi-job workflow and pins the exact app-local `smf/` path. Its
-essential Action calls are shown below only to explain the three phases:
+- [Getting started](https://github.com/Ventairy/smf/blob/main/doc/getting-started.md)
+- [Apple setup](https://github.com/Ventairy/smf/blob/main/doc/apple-bootstrap.md)
+- [Android and Google Play setup](https://github.com/Ventairy/smf/blob/main/doc/android-bootstrap.md)
+- [Configuration](https://github.com/Ventairy/smf/blob/main/doc/configuration.md)
+- [Operations and recovery](https://github.com/Ventairy/smf/blob/main/doc/operations.md)
+- [Security](https://github.com/Ventairy/smf/blob/main/doc/security.md)
 
-```yaml
-env:
-  SMF_PATH: apps/mobile/smf
+`smf init --workflow-only` refreshes the supported workflow after an upgrade.
 
-- uses: Ventairy/smf-action@v1
-  with:
-    phase: pull-request
-    smf-path: ${{ env.SMF_PATH }}
+## Platform execution
 
-- uses: Ventairy/smf-action@v1
-  with:
-    phase: release-candidate
-    smf-path: ${{ env.SMF_PATH }}
-    app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-    app-store-connect-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-    app-store-connect-private-key-base64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
-    ios-certificate-base64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-    ios-certificate-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-    ios-provisioning-profiles-base64: ${{ secrets.IOS_PROVISIONING_PROFILES_BASE64 }}
+The generated workflow:
 
-- uses: Ventairy/smf-action@v1
-  with:
-    phase: ship
-    smf-path: ${{ env.SMF_PATH }}
-    app-store-connect-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-    app-store-connect-issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-    app-store-connect-private-key-base64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
-```
+- plans on Ubuntu;
+- uses a release matrix from the Action’s `releases` output;
+- runs iOS candidates on macOS;
+- runs Android candidates on Ubuntu;
+- serializes candidate jobs so both receipts can be committed safely to the
+  shared branch; and
+- runs platform ship jobs after merge without rebuilding.
 
-> [!IMPORTANT]
-> The release-candidate phase requires macOS and the supported Xcode/Flutter toolchain.
-> The generated workflow searches only the selected app and its ancestors for
-> `.fvmrc` or legacy `.fvm/fvm_config.json`, then installs that declared SDK.
-> Repositories without FVM receive current stable Flutter. When
-> `before_create_pr.dart` exists, the pull-request job installs the same
-> selected project toolchain before invoking the Action; otherwise that job
-> avoids the unnecessary setup.
-> Use an App Store Connect API key with `Developer` access only for `upload`
-> delivery without TestFlight groups. Group assignment and App Review
-> submission require at least `App Manager` access.
-> The generated workflow uses GitHub-hosted `macos-26`; a compatible ephemeral
-> self-hosted runner is also valid. Pull-request and ship can run on Ubuntu.
+It also calls the bundled `resolve-project` and `setup-flutter` sub-actions so
+the selected nested app and FVM/stable Flutter toolchain are consistent.
 
 ## Inputs
 
-| Input                                  | Phase                  | Required      | Purpose                                                     |
-| -------------------------------------- | ---------------------- | ------------- | ----------------------------------------------------------- |
-| `phase`                                | all                    | yes           | `pull-request`, `release-candidate`, or `ship`              |
-| `smf-path`                             | all                    | one app: no   | Exact app-local `smf` directory when discovery is ambiguous |
-| `github-token`                         | all                    | default token | Maintains PRs, receipts, labels, tags, and releases         |
-| `app-store-connect-key-id`             | release-candidate/ship | yes           | API key ID                                                  |
-| `app-store-connect-issuer-id`          | release-candidate/ship | yes           | API issuer ID                                               |
-| `app-store-connect-private-key-base64` | release-candidate/ship | yes           | Base64 `.p8`                                                |
-| `ios-certificate-base64`               | release-candidate      | yes           | Base64 Apple Distribution `.p12`                            |
-| `ios-certificate-password`             | release-candidate      | yes           | `.p12` password                                             |
-| `ios-provisioning-profiles-base64`     | release-candidate      | yes           | Base64 profile or bundle-ID JSON map                        |
+| Input          | Phase          | Purpose                                        |
+| -------------- | -------------- | ---------------------------------------------- |
+| `phase`        | all            | `pull-request`, `release-candidate`, or `ship` |
+| `platform`     | candidate/ship | `ios` or `android`                             |
+| `smf-path`     | all            | Exact nested app `smf` directory               |
+| `github-token` | all            | PR, receipt, tag, and Release writes           |
 
-The Action intentionally has no Flutter-version inputs. Configure the exact
-project toolchain in the workflow. smf automatically uses
-`fvm flutter build ipa --release` when the selected app or an ancestor up to
-the Git root has `.fvmrc` or legacy `.fvm/fvm_config.json`, and
-`flutter build ipa --release` otherwise.
+Apple candidate/ship:
 
-Commit `.fvmrc` for reproducible local and CI builds. Without FVM, the
-generated workflow installs whichever Flutter release is current on the stable
-channel, so verify compatibility before each candidate.
+| Input                                  | Candidate | Ship |
+| -------------------------------------- | --------- | ---- |
+| `app-store-connect-key-id`             | yes       | yes  |
+| `app-store-connect-issuer-id`          | yes       | yes  |
+| `app-store-connect-private-key-base64` | yes       | yes  |
+| `ios-certificate-base64`               | yes       | no   |
+| `ios-certificate-password`             | yes       | no   |
+| `ios-provisioning-profiles-base64`     | yes       | no   |
 
-```yaml
-platforms:
-  ios:
-    build_command: fvm dart run release:build_ios
-    ipa_output_path: dist/ios
-```
+Android candidate/ship:
 
-Both fields are optional. Override `build_command` only for a custom wrapper or
-build system. Override `ipa_output_path` only when that command writes the IPA
-outside Flutter's standard `build/ios/ipa` directory.
+| Input                                     | Candidate | Ship |
+| ----------------------------------------- | --------- | ---- |
+| `google-play-service-account-json-base64` | yes       | yes  |
+| `android-keystore-base64`                 | yes       | no   |
+| `android-key-alias`                       | yes       | no   |
+| `android-keystore-password`               | yes       | no   |
+| `android-key-password`                    | yes       | no   |
 
-smf appends the planned version, next Apple build number, generated
-export-options plist, and configured flavor automatically.
-`build_command` must be one command invocation. Use a typed hook for pre-build
-preparation. For a multi-step build or post-build verification, use one
-checked-in executable wrapper that accepts and forwards all appended arguments.
-The [configuration guide](https://github.com/Ventairy/smf/blob/main/doc/configuration.md#build-command-and-ipa-output)
-includes a wrapper example.
-
-Custom workflows must install the selected app's toolchain before any Action
-phase that can run a hook or build the app. The generated workflow does this
-automatically. The Action preserves whatever toolchain `PATH` exists when each
-invocation begins.
-
-One Git repository currently supports one independently released SMF app.
-`smf-path` chooses the app/configuration but does not namespace the shared
-`smf/ios` branch or `ios-vX.Y.Z` tags. Use separate repositories for
-independently released apps until app-scoped namespaces are supported.
+The generated workflow supplies these from GitHub secrets. See the platform
+bootstrap guides before creating them.
 
 ## Outputs
 
-The action emits fields relevant to the selected phase:
+| Phase               | Outputs                                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pull-request`      | `phase`, `releases` JSON matrix, optional `branch`, `pull-request-number`; `platform`/`version` only when one release is selected |
+| `release-candidate` | `phase`, `platform`, `version`, `artifact-id`, `build-number`                                                                     |
+| `ship`              | `phase`, `platform`, `version`, `artifact-id`, `build-number`, `release-url`                                                      |
 
-| Selected phase      | Outputs                                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `pull-request`      | `phase` (`noop`, `release-candidate`, or `ship`), plus `platform`, `version`, `branch`, and `pull-request-number` when relevant |
-| `release-candidate` | `phase=release-candidate`, `platform`, `version`, `build-id`, and `build-number`                                                |
-| `ship`              | `phase=ship`, `platform`, `version`, `build-id`, and `release-url`                                                              |
+`artifact-id` is the App Store Connect build ID for iOS and Google Play
+`versionCode` for Android.
 
-The generated workflow uses `phase` and `branch` to dispatch the macOS release-candidate job without depending on token-generated pushes to start another workflow.
+## Permissions and security
 
-When `pull-request` uses the default `GITHUB_TOKEN`, GitHub does not create new workflow
-runs for the resulting PR event. This Action's release-candidate still runs because the
-generated workflow dispatches it from the pull-request output. If the repository's
-other `pull_request` workflows must run, pass a GitHub App installation token
-(preferred) or a narrowly scoped personal access token through `github-token`.
+The repository/organization must allow GitHub Actions to create pull requests.
+The generated jobs grant only the write scopes used by each phase.
 
-The repository or organization must also allow GitHub Actions to create pull
-requests. Enable **Settings → Actions → General → Workflow permissions → Allow
-GitHub Actions to create and approve pull requests**. If organization policy
-locks that option off, pass an allowed GitHub App installation token or
-fine-grained personal access token to `github-token`; grant Contents, Pull
-requests, and Issues read/write access.
+Generated checkouts use `persist-credentials: false`. The Action masks
+credentials and preserves the consumer Flutter toolchain separately from its
+vendored Dart runtime.
 
-Generated checkouts use `persist-credentials: false`. The action exposes its
-token only to the individual authenticated Git operation that needs it, so
-Flutter builds and repository hooks cannot reuse a checkout credential.
+Never run store credentials against untrusted fork code. Keep both store modes
+at `upload` until candidate-only acceptance succeeds. Follow the
+[before-merge checklist](https://github.com/Ventairy/smf/blob/main/doc/operations.md#before-merging).
 
-Do not merge the release PR until the release-candidate job has committed its receipt
-and the exact TestFlight build has been tested. The initializer defaults App
-Store behavior to `upload`; submission for review is an explicit
-configuration opt-in. Follow the
-[before-merge checklist](https://github.com/Ventairy/smf/blob/main/doc/operations.md#before-merging)
-for the complete approval procedure.
+## Development
 
-## Action development
-
-This section is for contributors to `smf-action`, not for repositories using
-the Action.
-
-The Action is deliberately hybrid:
-
-- It vendors the exact SMF Dart workspace source, owns a generated deployment
-  lockfile, installs its own pinned Dart SDK, and enforces that lockfile.
-- Dart owns release planning, GitHub operations, signing, TestFlight, App Store
-  Connect, the installed CLI, and the reusable library APIs.
-- TypeScript only reads native Action inputs/context, masks secrets, launches
-  Dart, maps failures, and writes outputs.
-
-The Action captures the consumer's incoming `PATH` before installing its pinned
-Dart SDK. SMF runs through the isolated Dart executable, while repository
-hooks and `build_command` inherit the original project toolchain path. This
-prevents the Action's Dart from replacing the Dart bundled with the project's
-Flutter SDK.
-
-The repository checks in two generated artifacts:
-
-- `vendor/smf`: exact Dart workspace source, Action-owned deployment
-  lockfile, and `SMF_COMMIT` provenance record;
-- `dist`: bundled thin TypeScript Action adapter.
-
-Hosted CI checks out the recorded public SMF commit and compares every
-vendored source/package file byte-for-byte. The Action-owned
-`pubspec.lock` is verified separately with `--enforce-lockfile`.
-
-After an SMF change, start from a clean adjacent SMF checkout. Run
-`vendor-smf` with Dart 3.10 so it copies the runtime packages, records the
-workspace commit, and
-generates the Action's deployment lockfile:
+The Action vendors the exact SMF runtime packages and records their source
+commit. After committing a clean SMF workspace change:
 
 ```bash
 pnpm run vendor-smf
@@ -233,6 +124,5 @@ dart pub get --enforce-lockfile -C vendor/smf
 pnpm run check
 ```
 
-Review both generated diffs before release. Follow this repository's
-[Action release procedure](RELEASING.md) and the SMF workspace
-[release procedure](https://github.com/Ventairy/smf/blob/main/RELEASING.md).
+Review `vendor/smf`, its lockfile/provenance, and `dist` before release. See
+[RELEASING.md](RELEASING.md).

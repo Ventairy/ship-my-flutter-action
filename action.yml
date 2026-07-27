@@ -1,5 +1,5 @@
 name: SMF
-description: Open Flutter release PRs, publish TestFlight candidates, and ship the exact tested iOS build.
+description: Open shared Flutter release PRs, publish store candidates, and ship each exact tested platform build.
 author: Ventairy
 
 branding:
@@ -10,6 +10,9 @@ inputs:
   phase:
     description: "Workflow phase: pull-request, release-candidate, or ship."
     required: true
+  platform:
+    description: Platform for release-candidate or ship (ios or android).
+    required: false
   smf-path:
     description: Explicit app/smf directory when the repository contains multiple apps.
     required: false
@@ -35,6 +38,21 @@ inputs:
   ios-provisioning-profiles-base64:
     description: A Base64 profile or JSON object mapping bundle IDs to Base64 App Store profiles.
     required: false
+  google-play-service-account-json-base64:
+    description: Base64-encoded Google Play service-account JSON.
+    required: false
+  android-keystore-base64:
+    description: Base64-encoded Google Play upload keystore.
+    required: false
+  android-key-alias:
+    description: Alias of the Google Play upload key.
+    required: false
+  android-keystore-password:
+    description: Password protecting the Android upload keystore.
+    required: false
+  android-key-password:
+    description: Password protecting the Android upload key.
+    required: false
 
 outputs:
   phase:
@@ -43,6 +61,9 @@ outputs:
   platform:
     description: Platform being released.
     value: ${{ steps.run.outputs.platform }}
+  releases:
+    description: JSON matrix of platform and version objects selected by pull-request.
+    value: ${{ steps.run.outputs.releases }}
   version:
     description: Planned or promoted platform version.
     value: ${{ steps.run.outputs.version }}
@@ -52,11 +73,11 @@ outputs:
   pull-request-number:
     description: Release pull request number.
     value: ${{ steps.run.outputs.pull-request-number }}
-  build-id:
-    description: App Store Connect build resource ID.
-    value: ${{ steps.run.outputs.build-id }}
+  artifact-id:
+    description: Store artifact identifier (Apple build ID or Google Play versionCode).
+    value: ${{ steps.run.outputs.artifact-id }}
   build-number:
-    description: Apple build number.
+    description: Platform build number or Google Play versionCode.
     value: ${{ steps.run.outputs.build-number }}
   release-url:
     description: GitHub Release URL.
@@ -102,6 +123,7 @@ runs:
       shell: bash
       env:
         INPUT_PHASE: ${{ inputs.phase }}
+        INPUT_PLATFORM: ${{ inputs.platform }}
         INPUT_SMF_PATH: ${{ inputs.smf-path }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
         SMF_DART: ${{ steps.smf-toolchain.outputs.dart }}
@@ -112,4 +134,9 @@ runs:
         SMF_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
         SMF_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
         SMF_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
+        SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ inputs.google-play-service-account-json-base64 }}
+        SMF_ANDROID_KEYSTORE_BASE64: ${{ inputs.android-keystore-base64 }}
+        SMF_ANDROID_KEY_ALIAS: ${{ inputs.android-key-alias }}
+        SMF_ANDROID_KEYSTORE_PASSWORD: ${{ inputs.android-keystore-password }}
+        SMF_ANDROID_KEY_PASSWORD: ${{ inputs.android-key-password }}
       run: node "$GITHUB_ACTION_PATH/dist/index.js"

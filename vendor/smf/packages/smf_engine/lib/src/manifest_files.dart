@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'config.dart';
-import 'git.dart';
-import 'model.dart';
-import 'paths.dart';
-import 'release_plan.dart';
-import 'serialization.dart';
+import 'package:smf_engine/src/config.dart';
+import 'package:smf_engine/src/git.dart';
+import 'package:smf_engine/src/model.dart';
+import 'package:smf_engine/src/paths.dart';
+import 'package:smf_engine/src/release_plan.dart';
+import 'package:smf_engine/src/serialization.dart';
 
 Future<void> applyReleasePlan(
   String root,
@@ -46,9 +46,16 @@ Future<void> applyReleasePlan(
         pendingRelease: true,
       ),
     ),
+    Platform.android => manifest.copyWith(
+      android: manifest.android.copyWith(
+        version: plan.nextVersion,
+        pendingRelease: true,
+      ),
+    ),
   };
   final nextChangelog = switch (plan.platform) {
     Platform.ios => changelog.copyWith(iosReleases: releases),
+    Platform.android => changelog.copyWith(androidReleases: releases),
   };
   await (
     writeJson(paths.manifest, nextManifest.toJson()),
@@ -56,5 +63,6 @@ Future<void> applyReleasePlan(
   ).wait;
 }
 
-ChangelogManifest emptyChangelog() =>
-    const ChangelogManifest(iosReleases: <String, ChangelogRelease>{});
+ChangelogManifest emptyChangelog() => const ChangelogManifest(
+  iosReleases: <String, ChangelogRelease>{},
+);
