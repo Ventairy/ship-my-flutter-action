@@ -52,7 +52,6 @@ const OutputName = {
 } as const;
 
 const CredentialEnvironmentName = {
-  inputGitHubToken: "INPUT_GITHUB_TOKEN",
   githubToken: "SMF_GITHUB_TOKEN",
   appStoreConnectKeyId: "SMF_APP_STORE_CONNECT_KEY_ID",
   appStoreConnectIssuerId: "SMF_APP_STORE_CONNECT_ISSUER_ID",
@@ -130,9 +129,8 @@ function childEnvironment(): Record<string, string> {
   for (const [name, value] of Object.entries(process.env)) {
     if (value !== undefined) environment[name] = value;
   }
-  const token = process.env[CredentialEnvironmentName.inputGitHubToken]?.trim();
+  const token = process.env[CredentialEnvironmentName.githubToken]?.trim();
   if (!token) throw new Error("github-token is required.");
-  delete environment[CredentialEnvironmentName.inputGitHubToken];
   environment[CredentialEnvironmentName.githubToken] = token;
   for (const name of sensitiveEnvironmentNames) {
     delete process.env[name];

@@ -76,7 +76,7 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     process.env.GITHUB_OUTPUT = output;
     process.env.GITHUB_REPOSITORY = "ventairy/example";
     process.env.GITHUB_WORKSPACE = root;
-    process.env.INPUT_GITHUB_TOKEN = "not-a-real-token";
+    process.env.SMF_GITHUB_TOKEN = "not-a-real-token";
     process.env.INPUT_PHASE = "pull-request";
     process.env.PATH = `${path.dirname(dart)}${path.delimiter}${process.env.PATH ?? ""}`;
     process.env.SMF_DART = dart;

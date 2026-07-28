@@ -122,7 +122,7 @@ runs:
         INPUT_PHASE: ${{ inputs.phase }}
         INPUT_PLATFORM: ${{ inputs.platform }}
         INPUT_SMF_PATH: ${{ inputs.smf-path }}
-        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        SMF_GITHUB_TOKEN: ${{ inputs.github-token }}
         SMF_DART: ${{ steps.smf-toolchain.outputs.dart }}
         SMF_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
         SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
