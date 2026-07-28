@@ -3,26 +3,70 @@ import * as exec from "@actions/exec";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-type Phase = "pull-request" | "release-candidate" | "ship";
-type Platform = "ios" | "android";
 type JsonObject = Record<string, unknown>;
-type PullRequestResultPhase = "noop" | "release-candidate" | "ship";
 
-const sensitiveEnvironmentNames = [
-  "INPUT_GITHUB_TOKEN",
-  "SMF_GITHUB_TOKEN",
-  "SMF_APP_STORE_CONNECT_KEY_ID",
-  "SMF_APP_STORE_CONNECT_ISSUER_ID",
-  "SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64",
-  "SMF_IOS_CERTIFICATE_BASE64",
-  "SMF_IOS_CERTIFICATE_PASSWORD",
-  "SMF_IOS_PROVISIONING_PROFILES_BASE64",
-  "SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64",
-  "SMF_ANDROID_KEYSTORE_BASE64",
-  "SMF_ANDROID_KEY_ALIAS",
-  "SMF_ANDROID_KEYSTORE_PASSWORD",
-  "SMF_ANDROID_KEY_PASSWORD",
-] as const;
+const Phase = {
+  pullRequest: "pull-request",
+  releaseCandidate: "release-candidate",
+  ship: "ship",
+} as const;
+type Phase = (typeof Phase)[keyof typeof Phase];
+
+const Platform = {
+  ios: "ios",
+  android: "android",
+} as const;
+type Platform = (typeof Platform)[keyof typeof Platform];
+
+const PullRequestResultPhase = {
+  noop: "noop",
+  releaseCandidate: Phase.releaseCandidate,
+  ship: Phase.ship,
+} as const;
+type PullRequestResultPhase =
+  (typeof PullRequestResultPhase)[keyof typeof PullRequestResultPhase];
+
+const ResultField = {
+  phase: "phase",
+  releases: "releases",
+  platform: "platform",
+  version: "version",
+  branch: "branch",
+  pullRequestNumber: "pullRequestNumber",
+  artifactId: "artifactId",
+  buildNumber: "buildNumber",
+  githubReleaseUrl: "githubReleaseUrl",
+} as const;
+type ResultField = (typeof ResultField)[keyof typeof ResultField];
+
+const OutputName = {
+  phase: "phase",
+  releases: "releases",
+  platform: "platform",
+  version: "version",
+  branch: "branch",
+  pullRequestNumber: "pull-request-number",
+  artifactId: "artifact-id",
+  buildNumber: "build-number",
+  releaseUrl: "release-url",
+} as const;
+
+const CredentialEnvironmentName = {
+  inputGitHubToken: "INPUT_GITHUB_TOKEN",
+  githubToken: "SMF_GITHUB_TOKEN",
+  appStoreConnectKeyId: "SMF_APP_STORE_CONNECT_KEY_ID",
+  appStoreConnectIssuerId: "SMF_APP_STORE_CONNECT_ISSUER_ID",
+  appStoreConnectAuthKeyBase64: "SMF_APP_STORE_CONNECT_AUTH_KEY_BASE64",
+  iosCertificateBase64: "SMF_IOS_CERTIFICATE_BASE64",
+  iosCertificatePassword: "SMF_IOS_CERTIFICATE_PASSWORD",
+  googlePlayServiceAccountJson: "SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+  androidKeystoreBase64: "SMF_ANDROID_KEYSTORE_BASE64",
+  androidKeyAlias: "SMF_ANDROID_KEY_ALIAS",
+  androidKeystorePassword: "SMF_ANDROID_KEYSTORE_PASSWORD",
+  androidKeyPassword: "SMF_ANDROID_KEY_PASSWORD",
+} as const;
+
+const sensitiveEnvironmentNames = Object.values(CredentialEnvironmentName);
 
 function maskSensitiveInputs(): void {
   for (const name of sensitiveEnvironmentNames) {
@@ -34,9 +78,9 @@ function maskSensitiveInputs(): void {
 function phase(): Phase {
   const value = process.env.INPUT_PHASE?.trim();
   if (
-    value === "pull-request" ||
-    value === "release-candidate" ||
-    value === "ship"
+    value === Phase.pullRequest ||
+    value === Phase.releaseCandidate ||
+    value === Phase.ship
   ) {
     return value;
   }
@@ -58,16 +102,22 @@ function repository(): string {
 
 function selectedPlatform(selected: Phase): Platform | undefined {
   const value = process.env.INPUT_PLATFORM?.trim();
-  if (selected === "pull-request") {
-    if (value) {
-      throw new Error("platform must be omitted for the pull-request phase.");
-    }
-    return undefined;
+  switch (selected) {
+    case Phase.pullRequest:
+      if (value) {
+        throw new Error("platform must be omitted for the pull-request phase.");
+      }
+      return undefined;
+    case Phase.releaseCandidate:
+    case Phase.ship:
+      if (value === Platform.ios || value === Platform.android) return value;
+      throw new Error(
+        `platform must be "ios" or "android" for the ${selected} phase.`,
+      );
+    default:
+      /* v8 ignore next -- phase() already narrows external input. */
+      return assertNever(selected);
   }
-  if (value === "ios" || value === "android") return value;
-  throw new Error(
-    `platform must be "ios" or "android" for the ${selected} phase.`,
-  );
 }
 
 function smfPath(): string | undefined {
@@ -80,10 +130,10 @@ function childEnvironment(): Record<string, string> {
   for (const [name, value] of Object.entries(process.env)) {
     if (value !== undefined) environment[name] = value;
   }
-  const token = process.env.INPUT_GITHUB_TOKEN?.trim();
+  const token = process.env[CredentialEnvironmentName.inputGitHubToken]?.trim();
   if (!token) throw new Error("github-token is required.");
-  delete environment.INPUT_GITHUB_TOKEN;
-  environment.SMF_GITHUB_TOKEN = token;
+  delete environment[CredentialEnvironmentName.inputGitHubToken];
+  environment[CredentialEnvironmentName.githubToken] = token;
   for (const name of sensitiveEnvironmentNames) {
     delete process.env[name];
   }
@@ -120,7 +170,7 @@ function parseResult(stdout: string): JsonObject {
 
 function requiredString(
   result: JsonObject,
-  name: string,
+  name: ResultField,
   context: string,
 ): string {
   const value = result[name];
@@ -135,7 +185,7 @@ function requiredString(
 
 function optionalPositiveInteger(
   result: JsonObject,
-  name: string,
+  name: ResultField,
   context: string,
 ): number | undefined {
   const value = result[name];
@@ -150,18 +200,23 @@ function optionalPositiveInteger(
 }
 
 function platform(result: JsonObject, context: string): Platform {
-  if (result.platform !== "ios" && result.platform !== "android") {
+  const value = result[ResultField.platform];
+  if (value !== Platform.ios && value !== Platform.android) {
     throw new Error(
       `smf returned an invalid ${context} result: ` +
         '"platform" must be "ios" or "android".',
     );
   }
-  return result.platform;
+  return value;
 }
 
 function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
-  const value = result.phase;
-  if (value === "noop" || value === "release-candidate" || value === "ship") {
+  const value = result[ResultField.phase];
+  if (
+    value === PullRequestResultPhase.noop ||
+    value === PullRequestResultPhase.releaseCandidate ||
+    value === PullRequestResultPhase.ship
+  ) {
     return value;
   }
   throw new Error(
@@ -172,46 +227,47 @@ function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
 
 function mapPullRequestOutputs(result: JsonObject): void {
   const nextPhase = pullRequestResultPhase(result);
-  if (nextPhase === "noop") {
-    core.setOutput("phase", nextPhase);
+  if (nextPhase === PullRequestResultPhase.noop) {
+    core.setOutput(OutputName.phase, nextPhase);
     return;
   }
 
   const releases = releaseMatrix(result);
   let branch: string | undefined;
   let pullRequestNumber: number | undefined;
-  if (nextPhase === "release-candidate") {
-    branch = requiredString(result, "branch", "pull-request");
+  if (nextPhase === PullRequestResultPhase.releaseCandidate) {
+    branch = requiredString(result, ResultField.branch, Phase.pullRequest);
     pullRequestNumber = optionalPositiveInteger(
       result,
-      "pullRequestNumber",
-      "pull-request",
+      ResultField.pullRequestNumber,
+      Phase.pullRequest,
     );
   }
 
-  core.setOutput("phase", nextPhase);
-  core.setOutput("releases", JSON.stringify(releases));
+  core.setOutput(OutputName.phase, nextPhase);
+  core.setOutput(OutputName.releases, JSON.stringify(releases));
   if (releases.length === 1) {
-    core.setOutput("platform", releases[0]!.platform);
-    core.setOutput("version", releases[0]!.version);
+    core.setOutput(OutputName.platform, releases[0]!.platform);
+    core.setOutput(OutputName.version, releases[0]!.version);
   }
-  if (branch !== undefined) core.setOutput("branch", branch);
+  if (branch !== undefined) core.setOutput(OutputName.branch, branch);
   if (pullRequestNumber !== undefined) {
-    core.setOutput("pull-request-number", String(pullRequestNumber));
+    core.setOutput(OutputName.pullRequestNumber, String(pullRequestNumber));
   }
 }
 
 function releaseMatrix(
   result: JsonObject,
 ): Array<{ platform: Platform; version: string }> {
-  if (!Array.isArray(result.releases) || result.releases.length === 0) {
+  const values = result[ResultField.releases];
+  if (!Array.isArray(values) || values.length === 0) {
     throw new Error(
       'smf returned an invalid pull-request result: "releases" must be a ' +
         "non-empty list.",
     );
   }
   const seen = new Set<Platform>();
-  return result.releases.map((value) => {
+  return values.map((value) => {
     if (value === null || Array.isArray(value) || typeof value !== "object") {
       throw new Error(
         "smf returned an invalid pull-request result: each release must be " +
@@ -228,63 +284,93 @@ function releaseMatrix(
     seen.add(releasePlatform);
     return {
       platform: releasePlatform,
-      version: requiredString(release, "version", "pull-request release"),
+      version: requiredString(
+        release,
+        ResultField.version,
+        "pull-request release",
+      ),
     };
   });
 }
 
 function mapReleaseCandidateOutputs(result: JsonObject): void {
-  const selected = platform(result, "release-candidate");
-  const version = requiredString(result, "version", "release-candidate");
-  const artifactId = requiredString(result, "artifactId", "release-candidate");
+  const selected = platform(result, Phase.releaseCandidate);
+  const version = requiredString(
+    result,
+    ResultField.version,
+    Phase.releaseCandidate,
+  );
+  const artifactId = requiredString(
+    result,
+    ResultField.artifactId,
+    Phase.releaseCandidate,
+  );
   const buildNumber = requiredString(
     result,
-    "buildNumber",
-    "release-candidate",
+    ResultField.buildNumber,
+    Phase.releaseCandidate,
   );
 
-  core.setOutput("phase", "release-candidate");
-  core.setOutput("platform", selected);
-  core.setOutput("version", version);
-  core.setOutput("artifact-id", artifactId);
-  core.setOutput("build-number", buildNumber);
+  core.setOutput(OutputName.phase, Phase.releaseCandidate);
+  core.setOutput(OutputName.platform, selected);
+  core.setOutput(OutputName.version, version);
+  core.setOutput(OutputName.artifactId, artifactId);
+  core.setOutput(OutputName.buildNumber, buildNumber);
 }
 
 function mapShipOutputs(result: JsonObject): void {
-  const selected = platform(result, "ship");
-  const version = requiredString(result, "version", "ship");
-  const artifactId = requiredString(result, "artifactId", "ship");
-  const buildNumber = requiredString(result, "buildNumber", "ship");
-  const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "ship");
+  const selected = platform(result, Phase.ship);
+  const version = requiredString(result, ResultField.version, Phase.ship);
+  const artifactId = requiredString(result, ResultField.artifactId, Phase.ship);
+  const buildNumber = requiredString(
+    result,
+    ResultField.buildNumber,
+    Phase.ship,
+  );
+  const githubReleaseUrl = requiredString(
+    result,
+    ResultField.githubReleaseUrl,
+    Phase.ship,
+  );
 
-  core.setOutput("phase", "ship");
-  core.setOutput("platform", selected);
-  core.setOutput("version", version);
-  core.setOutput("artifact-id", artifactId);
-  core.setOutput("build-number", buildNumber);
-  core.setOutput("release-url", githubReleaseUrl);
+  core.setOutput(OutputName.phase, Phase.ship);
+  core.setOutput(OutputName.platform, selected);
+  core.setOutput(OutputName.version, version);
+  core.setOutput(OutputName.artifactId, artifactId);
+  core.setOutput(OutputName.buildNumber, buildNumber);
+  core.setOutput(OutputName.releaseUrl, githubReleaseUrl);
 }
 
 function mapOutputs(selected: Phase, result: JsonObject): void {
   switch (selected) {
-    case "pull-request":
+    case Phase.pullRequest:
       mapPullRequestOutputs(result);
       return;
-    case "release-candidate":
+    case Phase.releaseCandidate:
       mapReleaseCandidateOutputs(result);
       return;
-    case "ship":
+    case Phase.ship:
       mapShipOutputs(result);
+      return;
+    default:
+      /* v8 ignore next -- Phase makes this statically unreachable. */
+      assertNever(selected);
   }
 }
+
+/* v8 ignore start -- compile-time exhaustiveness guard. */
+function assertNever(value: never): never {
+  throw new Error(`Unsupported exhaustive value "${String(value)}".`);
+}
+/* v8 ignore stop */
 
 export async function run(): Promise<void> {
   maskSensitiveInputs();
   const selected = phase();
   const targetPlatform = selectedPlatform(selected);
   if (
-    selected === "release-candidate" &&
-    targetPlatform === "ios" &&
+    selected === Phase.releaseCandidate &&
+    targetPlatform === Platform.ios &&
     process.platform !== "darwin"
   ) {
     throw new Error("An iOS release candidate requires a macOS runner.");

@@ -31225,21 +31225,57 @@ var external_node_url_ = __nccwpck_require__(3136);
 
 
 
-const sensitiveEnvironmentNames = [
-    "INPUT_GITHUB_TOKEN",
-    "SMF_GITHUB_TOKEN",
-    "SMF_APP_STORE_CONNECT_KEY_ID",
-    "SMF_APP_STORE_CONNECT_ISSUER_ID",
-    "SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64",
-    "SMF_IOS_CERTIFICATE_BASE64",
-    "SMF_IOS_CERTIFICATE_PASSWORD",
-    "SMF_IOS_PROVISIONING_PROFILES_BASE64",
-    "SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64",
-    "SMF_ANDROID_KEYSTORE_BASE64",
-    "SMF_ANDROID_KEY_ALIAS",
-    "SMF_ANDROID_KEYSTORE_PASSWORD",
-    "SMF_ANDROID_KEY_PASSWORD",
-];
+const Phase = {
+    pullRequest: "pull-request",
+    releaseCandidate: "release-candidate",
+    ship: "ship",
+};
+const Platform = {
+    ios: "ios",
+    android: "android",
+};
+const PullRequestResultPhase = {
+    noop: "noop",
+    releaseCandidate: Phase.releaseCandidate,
+    ship: Phase.ship,
+};
+const ResultField = {
+    phase: "phase",
+    releases: "releases",
+    platform: "platform",
+    version: "version",
+    branch: "branch",
+    pullRequestNumber: "pullRequestNumber",
+    artifactId: "artifactId",
+    buildNumber: "buildNumber",
+    githubReleaseUrl: "githubReleaseUrl",
+};
+const OutputName = {
+    phase: "phase",
+    releases: "releases",
+    platform: "platform",
+    version: "version",
+    branch: "branch",
+    pullRequestNumber: "pull-request-number",
+    artifactId: "artifact-id",
+    buildNumber: "build-number",
+    releaseUrl: "release-url",
+};
+const CredentialEnvironmentName = {
+    inputGitHubToken: "INPUT_GITHUB_TOKEN",
+    githubToken: "SMF_GITHUB_TOKEN",
+    appStoreConnectKeyId: "SMF_APP_STORE_CONNECT_KEY_ID",
+    appStoreConnectIssuerId: "SMF_APP_STORE_CONNECT_ISSUER_ID",
+    appStoreConnectAuthKeyBase64: "SMF_APP_STORE_CONNECT_AUTH_KEY_BASE64",
+    iosCertificateBase64: "SMF_IOS_CERTIFICATE_BASE64",
+    iosCertificatePassword: "SMF_IOS_CERTIFICATE_PASSWORD",
+    googlePlayServiceAccountJson: "SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+    androidKeystoreBase64: "SMF_ANDROID_KEYSTORE_BASE64",
+    androidKeyAlias: "SMF_ANDROID_KEY_ALIAS",
+    androidKeystorePassword: "SMF_ANDROID_KEYSTORE_PASSWORD",
+    androidKeyPassword: "SMF_ANDROID_KEY_PASSWORD",
+};
+const sensitiveEnvironmentNames = Object.values(CredentialEnvironmentName);
 function maskSensitiveInputs() {
     for (const name of sensitiveEnvironmentNames) {
         const value = process.env[name];
@@ -31249,9 +31285,9 @@ function maskSensitiveInputs() {
 }
 function phase() {
     const value = process.env.INPUT_PHASE?.trim();
-    if (value === "pull-request" ||
-        value === "release-candidate" ||
-        value === "ship") {
+    if (value === Phase.pullRequest ||
+        value === Phase.releaseCandidate ||
+        value === Phase.ship) {
         return value;
     }
     throw new Error(`Unsupported phase "${value ?? ""}".`);
@@ -31268,15 +31304,21 @@ function repository() {
 }
 function selectedPlatform(selected) {
     const value = process.env.INPUT_PLATFORM?.trim();
-    if (selected === "pull-request") {
-        if (value) {
-            throw new Error("platform must be omitted for the pull-request phase.");
-        }
-        return undefined;
+    switch (selected) {
+        case Phase.pullRequest:
+            if (value) {
+                throw new Error("platform must be omitted for the pull-request phase.");
+            }
+            return undefined;
+        case Phase.releaseCandidate:
+        case Phase.ship:
+            if (value === Platform.ios || value === Platform.android)
+                return value;
+            throw new Error(`platform must be "ios" or "android" for the ${selected} phase.`);
+        default:
+            /* v8 ignore next -- phase() already narrows external input. */
+            return assertNever(selected);
     }
-    if (value === "ios" || value === "android")
-        return value;
-    throw new Error(`platform must be "ios" or "android" for the ${selected} phase.`);
 }
 function smfPath() {
     const value = process.env.INPUT_SMF_PATH?.trim();
@@ -31288,11 +31330,11 @@ function childEnvironment() {
         if (value !== undefined)
             environment[name] = value;
     }
-    const token = process.env.INPUT_GITHUB_TOKEN?.trim();
+    const token = process.env[CredentialEnvironmentName.inputGitHubToken]?.trim();
     if (!token)
         throw new Error("github-token is required.");
-    delete environment.INPUT_GITHUB_TOKEN;
-    environment.SMF_GITHUB_TOKEN = token;
+    delete environment[CredentialEnvironmentName.inputGitHubToken];
+    environment[CredentialEnvironmentName.githubToken] = token;
     for (const name of sensitiveEnvironmentNames) {
         delete process.env[name];
     }
@@ -31342,15 +31384,18 @@ function optionalPositiveInteger(result, name, context) {
     return value;
 }
 function main_platform(result, context) {
-    if (result.platform !== "ios" && result.platform !== "android") {
+    const value = result[ResultField.platform];
+    if (value !== Platform.ios && value !== Platform.android) {
         throw new Error(`smf returned an invalid ${context} result: ` +
             '"platform" must be "ios" or "android".');
     }
-    return result.platform;
+    return value;
 }
 function pullRequestResultPhase(result) {
-    const value = result.phase;
-    if (value === "noop" || value === "release-candidate" || value === "ship") {
+    const value = result[ResultField.phase];
+    if (value === PullRequestResultPhase.noop ||
+        value === PullRequestResultPhase.releaseCandidate ||
+        value === PullRequestResultPhase.ship) {
         return value;
     }
     throw new Error('smf returned an invalid pull-request result: "phase" must be ' +
@@ -31358,36 +31403,37 @@ function pullRequestResultPhase(result) {
 }
 function mapPullRequestOutputs(result) {
     const nextPhase = pullRequestResultPhase(result);
-    if (nextPhase === "noop") {
-        setOutput("phase", nextPhase);
+    if (nextPhase === PullRequestResultPhase.noop) {
+        setOutput(OutputName.phase, nextPhase);
         return;
     }
     const releases = releaseMatrix(result);
     let branch;
     let pullRequestNumber;
-    if (nextPhase === "release-candidate") {
-        branch = requiredString(result, "branch", "pull-request");
-        pullRequestNumber = optionalPositiveInteger(result, "pullRequestNumber", "pull-request");
+    if (nextPhase === PullRequestResultPhase.releaseCandidate) {
+        branch = requiredString(result, ResultField.branch, Phase.pullRequest);
+        pullRequestNumber = optionalPositiveInteger(result, ResultField.pullRequestNumber, Phase.pullRequest);
     }
-    setOutput("phase", nextPhase);
-    setOutput("releases", JSON.stringify(releases));
+    setOutput(OutputName.phase, nextPhase);
+    setOutput(OutputName.releases, JSON.stringify(releases));
     if (releases.length === 1) {
-        setOutput("platform", releases[0].platform);
-        setOutput("version", releases[0].version);
+        setOutput(OutputName.platform, releases[0].platform);
+        setOutput(OutputName.version, releases[0].version);
     }
     if (branch !== undefined)
-        setOutput("branch", branch);
+        setOutput(OutputName.branch, branch);
     if (pullRequestNumber !== undefined) {
-        setOutput("pull-request-number", String(pullRequestNumber));
+        setOutput(OutputName.pullRequestNumber, String(pullRequestNumber));
     }
 }
 function releaseMatrix(result) {
-    if (!Array.isArray(result.releases) || result.releases.length === 0) {
+    const values = result[ResultField.releases];
+    if (!Array.isArray(values) || values.length === 0) {
         throw new Error('smf returned an invalid pull-request result: "releases" must be a ' +
             "non-empty list.");
     }
     const seen = new Set();
-    return result.releases.map((value) => {
+    return values.map((value) => {
         if (value === null || Array.isArray(value) || typeof value !== "object") {
             throw new Error("smf returned an invalid pull-request result: each release must be " +
                 "an object.");
@@ -31400,52 +31446,61 @@ function releaseMatrix(result) {
         seen.add(releasePlatform);
         return {
             platform: releasePlatform,
-            version: requiredString(release, "version", "pull-request release"),
+            version: requiredString(release, ResultField.version, "pull-request release"),
         };
     });
 }
 function mapReleaseCandidateOutputs(result) {
-    const selected = main_platform(result, "release-candidate");
-    const version = requiredString(result, "version", "release-candidate");
-    const artifactId = requiredString(result, "artifactId", "release-candidate");
-    const buildNumber = requiredString(result, "buildNumber", "release-candidate");
-    setOutput("phase", "release-candidate");
-    setOutput("platform", selected);
-    setOutput("version", version);
-    setOutput("artifact-id", artifactId);
-    setOutput("build-number", buildNumber);
+    const selected = main_platform(result, Phase.releaseCandidate);
+    const version = requiredString(result, ResultField.version, Phase.releaseCandidate);
+    const artifactId = requiredString(result, ResultField.artifactId, Phase.releaseCandidate);
+    const buildNumber = requiredString(result, ResultField.buildNumber, Phase.releaseCandidate);
+    setOutput(OutputName.phase, Phase.releaseCandidate);
+    setOutput(OutputName.platform, selected);
+    setOutput(OutputName.version, version);
+    setOutput(OutputName.artifactId, artifactId);
+    setOutput(OutputName.buildNumber, buildNumber);
 }
 function mapShipOutputs(result) {
-    const selected = main_platform(result, "ship");
-    const version = requiredString(result, "version", "ship");
-    const artifactId = requiredString(result, "artifactId", "ship");
-    const buildNumber = requiredString(result, "buildNumber", "ship");
-    const githubReleaseUrl = requiredString(result, "githubReleaseUrl", "ship");
-    setOutput("phase", "ship");
-    setOutput("platform", selected);
-    setOutput("version", version);
-    setOutput("artifact-id", artifactId);
-    setOutput("build-number", buildNumber);
-    setOutput("release-url", githubReleaseUrl);
+    const selected = main_platform(result, Phase.ship);
+    const version = requiredString(result, ResultField.version, Phase.ship);
+    const artifactId = requiredString(result, ResultField.artifactId, Phase.ship);
+    const buildNumber = requiredString(result, ResultField.buildNumber, Phase.ship);
+    const githubReleaseUrl = requiredString(result, ResultField.githubReleaseUrl, Phase.ship);
+    setOutput(OutputName.phase, Phase.ship);
+    setOutput(OutputName.platform, selected);
+    setOutput(OutputName.version, version);
+    setOutput(OutputName.artifactId, artifactId);
+    setOutput(OutputName.buildNumber, buildNumber);
+    setOutput(OutputName.releaseUrl, githubReleaseUrl);
 }
 function mapOutputs(selected, result) {
     switch (selected) {
-        case "pull-request":
+        case Phase.pullRequest:
             mapPullRequestOutputs(result);
             return;
-        case "release-candidate":
+        case Phase.releaseCandidate:
             mapReleaseCandidateOutputs(result);
             return;
-        case "ship":
+        case Phase.ship:
             mapShipOutputs(result);
+            return;
+        default:
+            /* v8 ignore next -- Phase makes this statically unreachable. */
+            assertNever(selected);
     }
 }
+/* v8 ignore start -- compile-time exhaustiveness guard. */
+function assertNever(value) {
+    throw new Error(`Unsupported exhaustive value "${String(value)}".`);
+}
+/* v8 ignore stop */
 async function run() {
     maskSensitiveInputs();
     const selected = phase();
     const targetPlatform = selectedPlatform(selected);
-    if (selected === "release-candidate" &&
-        targetPlatform === "ios" &&
+    if (selected === Phase.releaseCandidate &&
+        targetPlatform === Platform.ios &&
         process.platform !== "darwin") {
         throw new Error("An iOS release candidate requires a macOS runner.");
     }

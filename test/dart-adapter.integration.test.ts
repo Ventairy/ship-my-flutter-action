@@ -60,7 +60,7 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
       [
         path.join(runtimeRoot, "packages", "smf_cli", "bin", "smf.dart"),
         "init",
-        "--bundle-id",
+        "--ios-bundle-id",
         "dev.example.app",
       ],
       { cwd: root },

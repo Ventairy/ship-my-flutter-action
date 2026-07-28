@@ -17,6 +17,13 @@ const setupFlutterPath = path.resolve(
 );
 
 describe("composite action contract", () => {
+  it("describes app-scoped release automation", async () => {
+    const action = await fs.readFile(actionPath, "utf8");
+
+    expect(action).toContain("Open app-scoped Flutter release PRs");
+    expect(action).not.toContain("Open shared Flutter release PRs");
+  });
+
   it("leaves Flutter installation to the consumer workflow", async () => {
     const action = await fs.readFile(actionPath, "utf8");
 
@@ -57,7 +64,11 @@ describe("composite action contract", () => {
     const action = await fs.readFile(actionPath, "utf8");
 
     expect(action).toContain("platform:");
-    expect(action).toContain("google-play-service-account-json-base64:");
+    expect(action).toContain("app-store-connect-auth-key-base64:");
+    expect(action).not.toContain("ios-provisioning-profiles-base64:");
+    expect(action).not.toContain("app-store-connect-private-key-base64:");
+    expect(action).toContain("google-play-service-account-json:");
+    expect(action).not.toContain("google-play-service-account-json-base64:");
     expect(action).toContain("android-keystore-base64:");
     expect(action).toContain("releases:");
     expect(action).toContain("artifact-id:");
@@ -74,5 +85,7 @@ describe("composite action contract", () => {
     );
     expect(setupFlutter).toContain("subosito/flutter-action@");
     expect(setupFlutter).toContain("dart pub global activate fvm");
+    expect(setupFlutter).toContain("FVM_CACHE_PATH=%s/fvm");
+    expect(setupFlutter).toContain("path: ~/fvm/versions");
   });
 });

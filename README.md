@@ -4,12 +4,17 @@
 
 The official GitHub Action for [SMF](https://github.com/Ventairy/smf).
 
-It runs one shared Flutter release PR with independent iOS and Android
-candidates:
+For one selected Flutter app, it runs one release PR with independent iOS and
+Android candidates:
 
-- `pull-request` plans every pending platform and maintains `smf/release`;
+- `pull-request` plans every pending platform and maintains the app-scoped
+  `smf/<app-id>/release` branch;
 - `release-candidate` builds/uploads one selected platform candidate;
 - `ship` verifies and delivers that same store artifact after merge.
+
+The ship phase treats the configured remote target branch as authoritative. It
+uses an isolated checkout of that branch and direct remote tag queries, so the
+workflow runner's checkout or tag cache cannot change what is delivered.
 
 > [!WARNING]
 > The Action is in pre-release validation and has no `v1` tag yet. The
@@ -23,21 +28,23 @@ run initialization from the Flutter app:
 ```bash
 dart install smf_cli
 smf init \
-  --current-version 1.0.0 \
-  --bundle-id com.example.myapp \
-  --package-name com.example.myapp
+  --version 1.0.0 \
+  --ios-bundle-id com.example.myapp \
+  --android-package-name com.example.myapp
 ```
 
-Then follow the definitive [SMF user guide](https://github.com/Ventairy/smf/tree/main/doc):
+Then follow the definitive [SMF user guide](https://github.com/Ventairy/smf):
 
 - [Getting started](https://github.com/Ventairy/smf/blob/main/doc/getting-started.md)
 - [Apple setup](https://github.com/Ventairy/smf/blob/main/doc/apple-bootstrap.md)
 - [Android and Google Play setup](https://github.com/Ventairy/smf/blob/main/doc/android-bootstrap.md)
 - [Configuration](https://github.com/Ventairy/smf/blob/main/doc/configuration.md)
+- [Typed hooks](https://github.com/Ventairy/smf/blob/main/doc/hooks.md)
 - [Operations and recovery](https://github.com/Ventairy/smf/blob/main/doc/operations.md)
 - [Security](https://github.com/Ventairy/smf/blob/main/doc/security.md)
 
-`smf init --workflow-only` refreshes the supported workflow after an upgrade.
+If `smf/config.yaml` exists but the generated workflow was removed,
+`smf init --github-actions` recreates only the GitHub Actions workflow.
 
 ## Platform execution
 
@@ -65,27 +72,26 @@ the selected nested app and FVM/stable Flutter toolchain are consistent.
 
 Apple candidate/ship:
 
-| Input                                  | Candidate | Ship |
-| -------------------------------------- | --------- | ---- |
-| `app-store-connect-key-id`             | yes       | yes  |
-| `app-store-connect-issuer-id`          | yes       | yes  |
-| `app-store-connect-private-key-base64` | yes       | yes  |
-| `ios-certificate-base64`               | yes       | no   |
-| `ios-certificate-password`             | yes       | no   |
-| `ios-provisioning-profiles-base64`     | yes       | no   |
+| Input                               | Candidate | Ship |
+| ----------------------------------- | --------- | ---- |
+| `app-store-connect-key-id`          | yes       | yes  |
+| `app-store-connect-issuer-id`       | yes       | yes  |
+| `app-store-connect-auth-key-base64` | yes       | yes  |
+| `ios-certificate-base64`            | yes       | no   |
+| `ios-certificate-password`          | yes       | no   |
 
 Android candidate/ship:
 
-| Input                                     | Candidate | Ship |
-| ----------------------------------------- | --------- | ---- |
-| `google-play-service-account-json-base64` | yes       | yes  |
-| `android-keystore-base64`                 | yes       | no   |
-| `android-key-alias`                       | yes       | no   |
-| `android-keystore-password`               | yes       | no   |
-| `android-key-password`                    | yes       | no   |
+| Input                              | Candidate | Ship |
+| ---------------------------------- | --------- | ---- |
+| `google-play-service-account-json` | yes       | yes  |
+| `android-keystore-base64`          | yes       | no   |
+| `android-key-alias`                | yes       | no   |
+| `android-keystore-password`        | yes       | no   |
+| `android-key-password`             | yes       | no   |
 
-The generated workflow supplies these from GitHub secrets. See the platform
-bootstrap guides before creating them.
+The generated workflow supplies these from secrets in GitHub Environment
+`smf-<app-id>`. See the platform bootstrap guides before creating them.
 
 ## Outputs
 

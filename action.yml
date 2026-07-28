@@ -1,5 +1,5 @@
 name: SMF
-description: Open shared Flutter release PRs, publish store candidates, and ship each exact tested platform build.
+description: Open app-scoped Flutter release PRs, publish store candidates, and ship each exact tested platform build.
 author: Ventairy
 
 branding:
@@ -26,8 +26,8 @@ inputs:
   app-store-connect-issuer-id:
     description: App Store Connect API issuer ID.
     required: false
-  app-store-connect-private-key-base64:
-    description: Base64-encoded App Store Connect .p8 private key.
+  app-store-connect-auth-key-base64:
+    description: Base64-encoded App Store Connect AuthKey_*.p8 file.
     required: false
   ios-certificate-base64:
     description: Base64-encoded Apple Distribution .p12 certificate.
@@ -35,11 +35,8 @@ inputs:
   ios-certificate-password:
     description: Password for the Apple Distribution .p12 certificate.
     required: false
-  ios-provisioning-profiles-base64:
-    description: A Base64 profile or JSON object mapping bundle IDs to Base64 App Store profiles.
-    required: false
-  google-play-service-account-json-base64:
-    description: Base64-encoded Google Play service-account JSON.
+  google-play-service-account-json:
+    description: Complete Google Play service-account JSON.
     required: false
   android-keystore-base64:
     description: Base64-encoded Google Play upload keystore.
@@ -59,13 +56,13 @@ outputs:
     description: For pull-request, the selected next phase; otherwise, the completed phase.
     value: ${{ steps.run.outputs.phase }}
   platform:
-    description: Platform being released.
+    description: Selected platform; omitted when a pull request contains both platforms.
     value: ${{ steps.run.outputs.platform }}
   releases:
     description: JSON matrix of platform and version objects selected by pull-request.
     value: ${{ steps.run.outputs.releases }}
   version:
-    description: Planned or promoted platform version.
+    description: Selected platform version; omitted when a pull request contains both platforms.
     value: ${{ steps.run.outputs.version }}
   branch:
     description: Release PR branch for a candidate checkout.
@@ -130,11 +127,10 @@ runs:
         SMF_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
         SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
         SMF_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}
-        SMF_APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ inputs.app-store-connect-private-key-base64 }}
+        SMF_APP_STORE_CONNECT_AUTH_KEY_BASE64: ${{ inputs.app-store-connect-auth-key-base64 }}
         SMF_IOS_CERTIFICATE_BASE64: ${{ inputs.ios-certificate-base64 }}
         SMF_IOS_CERTIFICATE_PASSWORD: ${{ inputs.ios-certificate-password }}
-        SMF_IOS_PROVISIONING_PROFILES_BASE64: ${{ inputs.ios-provisioning-profiles-base64 }}
-        SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ inputs.google-play-service-account-json-base64 }}
+        SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ inputs.google-play-service-account-json }}
         SMF_ANDROID_KEYSTORE_BASE64: ${{ inputs.android-keystore-base64 }}
         SMF_ANDROID_KEY_ALIAS: ${{ inputs.android-key-alias }}
         SMF_ANDROID_KEYSTORE_PASSWORD: ${{ inputs.android-keystore-password }}

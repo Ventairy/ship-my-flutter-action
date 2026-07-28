@@ -20,6 +20,22 @@ runs:
       with:
         sdk: 3.10.0
     - if: inputs.uses-fvm == 'true'
+      name: Configure FVM
+      shell: bash
+      env:
+        FVM_ROOT: ${{ inputs.fvm-root }}
+      run: |
+        if [[ -z "$FVM_ROOT" || ! -d "$FVM_ROOT" ]]; then
+          echo "The inherited FVM root is missing." >&2
+          exit 1
+        fi
+        if [[ -z "$HOME" || "$HOME" == *$'\n'* || "$HOME" == *$'\r'* ]]; then
+          echo "The runner home directory is missing or invalid." >&2
+          exit 1
+        fi
+        printf 'FVM_CACHE_PATH=%s/fvm\n' "$HOME" >> "$GITHUB_ENV"
+        dart pub global activate fvm 4.1.2
+    - if: inputs.uses-fvm == 'true'
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/fvm/versions
@@ -29,11 +45,6 @@ runs:
       env:
         FVM_ROOT: ${{ inputs.fvm-root }}
       run: |
-        if [[ -z "$FVM_ROOT" || ! -d "$FVM_ROOT" ]]; then
-          echo "The inherited FVM root is missing." >&2
-          exit 1
-        fi
-        dart pub global activate fvm 4.1.2
         (cd "$FVM_ROOT" && fvm install)
     - if: inputs.uses-fvm != 'true'
       uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0

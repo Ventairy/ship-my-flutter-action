@@ -94,6 +94,26 @@ describe("action adapter", () => {
     );
   });
 
+  it("rejects a platform input for the pull-request phase", async () => {
+    process.env.INPUT_PHASE = "pull-request";
+    process.env.INPUT_PLATFORM = "ios";
+
+    await expect(run()).rejects.toThrow(
+      "platform must be omitted for the pull-request phase",
+    );
+    expect(getExecOutput).not.toHaveBeenCalled();
+  });
+
+  it("requires a supported platform for direct platform phases", async () => {
+    process.env.INPUT_PHASE = "ship";
+    process.env.INPUT_PLATFORM = "web";
+
+    await expect(run()).rejects.toThrow(
+      'platform must be "ios" or "android" for the ship phase',
+    );
+    expect(getExecOutput).not.toHaveBeenCalled();
+  });
+
   it("rejects release-candidate builds on a non-macOS runner", async () => {
     vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     process.env.INPUT_PHASE = "release-candidate";
@@ -292,6 +312,51 @@ describe("action adapter", () => {
     );
   });
 
+  it("rejects a pull-request result with no releases", async () => {
+    process.env.INPUT_PHASE = "pull-request";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "ship",
+        releases: [],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow('"releases" must be a non-empty list');
+  });
+
+  it("rejects a pull-request result with a non-object release", async () => {
+    process.env.INPUT_PHASE = "pull-request";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "ship",
+        releases: ["ios"],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow("each release must be an object");
+  });
+
+  it("rejects duplicate platform releases", async () => {
+    process.env.INPUT_PHASE = "pull-request";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "ship",
+        releases: [
+          { platform: "android", version: "1.0.0" },
+          { platform: "android", version: "1.0.1" },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow("duplicate android release targets");
+  });
+
   it("rejects an incomplete ship result", async () => {
     process.env.INPUT_PHASE = "ship";
     process.env.INPUT_PLATFORM = "android";
@@ -386,7 +451,10 @@ describe("action adapter", () => {
 
   it("masks every supplied release credential before execution", async () => {
     process.env.INPUT_PHASE = "pull-request";
+    process.env.SMF_APP_STORE_CONNECT_AUTH_KEY_BASE64 = "encoded-auth-key";
     process.env.SMF_IOS_CERTIFICATE_PASSWORD = "p12-password";
+    process.env.SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON =
+      '{\n  "type": "service_account"\n}';
     process.env.SMF_ANDROID_KEYSTORE_PASSWORD = "keystore-password";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
@@ -397,8 +465,21 @@ describe("action adapter", () => {
     await run();
 
     expect(setSecret).toHaveBeenCalledWith("token");
+    expect(setSecret).toHaveBeenCalledWith("encoded-auth-key");
     expect(setSecret).toHaveBeenCalledWith("p12-password");
+    expect(setSecret).toHaveBeenCalledWith('{\n  "type": "service_account"\n}');
     expect(setSecret).toHaveBeenCalledWith("keystore-password");
+    expect(getExecOutput).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        env: expect.objectContaining({
+          SMF_APP_STORE_CONNECT_AUTH_KEY_BASE64: "encoded-auth-key",
+          SMF_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:
+            '{\n  "type": "service_account"\n}',
+        }),
+      }),
+    );
   });
 
   it("rejects unknown phases before launching Dart", async () => {

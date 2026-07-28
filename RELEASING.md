@@ -9,8 +9,8 @@ ref.
 
 The Ventairy organization prevents the default `GITHUB_TOKEN` from opening pull
 requests. Add a repository secret named `RELEASE_PLEASE_TOKEN` before enabling
-releases. Until it exists, the Release Please workflow succeeds as a deliberate
-no-op and emits a warning.
+releases. If it is missing or invalid, Release Please fails so the broken release
+configuration remains visible.
 
 Prefer a GitHub App installation token for long-lived automation. A
 fine-grained personal access token is also supported when it is limited to this

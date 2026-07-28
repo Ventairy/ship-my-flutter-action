@@ -11,14 +11,19 @@ part 'smf_config.freezed.dart';
 abstract class SmfConfig with _$SmfConfig {
   /// Creates application configuration.
   const factory SmfConfig({
+    required String appId,
     @Default(IosConfig(enabled: false)) IosConfig ios,
     @Default(AndroidConfig()) AndroidConfig android,
-    @Default(1) int schemaVersion,
+    @Default(SmfConfig.currentSchemaVersion) int schemaVersion,
     String? flavor,
     @Default('main') String targetBranch,
+    @Default(<String>[]) List<String> releaseTriggerPaths,
   }) = _SmfConfig;
 
   const SmfConfig._();
+
+  /// Current `smf/config.yaml` contract version.
+  static const int currentSchemaVersion = 3;
 
   /// Enabled release platforms in deterministic workflow order.
   List<Platform> get enabledPlatforms => <Platform>[

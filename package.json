@@ -24,8 +24,11 @@
   "keywords": [
     "github-action",
     "flutter",
+    "ios",
+    "android",
     "testflight",
     "app-store",
+    "google-play",
     "release"
   ],
   "license": "Apache-2.0",

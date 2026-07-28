@@ -25,30 +25,14 @@ jobs:
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     steps:
-      - id: credential
-        name: Check the release credential
-        env:
-          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        shell: bash
-        run: |
-          if [[ -n "$RELEASE_PLEASE_TOKEN" ]]; then
-            echo "available=true" >>"$GITHUB_OUTPUT"
-          else
-            echo "available=false" >>"$GITHUB_OUTPUT"
-            echo "::warning::Release automation is waiting for the RELEASE_PLEASE_TOKEN repository secret."
-          fi
-
       - id: release
         name: Open or publish the release
-        if: steps.credential.outputs.available == 'true'
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Validate the release pull request
-        if: >-
-          steps.credential.outputs.available == 'true' &&
-          steps.release.outputs.prs_created == 'true'
+        if: steps.release.outputs.prs_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           RELEASE_PRS: ${{ steps.release.outputs.prs }}
@@ -68,9 +52,7 @@ jobs:
           gh workflow run ci.yml --ref "$branch"
 
       - name: Update floating Action tags
-        if: >-
-          steps.credential.outputs.available == 'true' &&
-          steps.release.outputs.release_created == 'true'
+        if: steps.release.outputs.release_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           MAJOR: ${{ steps.release.outputs.major }}
