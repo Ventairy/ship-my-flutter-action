@@ -17,7 +17,7 @@ beforeEach(() => {
   process.env.GITHUB_WORKSPACE = "/workspace";
   process.env.GITHUB_ACTION_PATH = "/action";
   process.env.GITHUB_REPOSITORY = "ventairy/example";
-  process.env.INPUT_GITHUB_TOKEN = "token";
+  process.env.SMF_GITHUB_TOKEN = "token";
   process.env.SMF_DART = "/toolchains/dart-3.10/bin/dart";
   process.env.SMF_CONSUMER_PATH = "/project/flutter/bin:/usr/bin";
 });
@@ -73,7 +73,7 @@ describe("action adapter", () => {
     );
     expect(setOutput).toHaveBeenCalledWith("pull-request-number", "12");
     expect(setSecret).toHaveBeenCalledWith("token");
-    expect(process.env.INPUT_GITHUB_TOKEN).toBeUndefined();
+    expect(process.env.SMF_GITHUB_TOKEN).toBeUndefined();
   });
 
   it("forwards an explicit SMF directory for a multi-app repository", async () => {
@@ -425,7 +425,7 @@ describe("action adapter", () => {
 
   it("requires the GitHub token before launching Dart", async () => {
     process.env.INPUT_PHASE = "pull-request";
-    process.env.INPUT_GITHUB_TOKEN = " ";
+    process.env.SMF_GITHUB_TOKEN = " ";
 
     await expect(run()).rejects.toThrow("github-token is required");
     expect(getExecOutput).not.toHaveBeenCalled();
