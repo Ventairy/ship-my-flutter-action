@@ -50,6 +50,7 @@ describe("action adapter", () => {
       [
         "run",
         "smf_cli:smf",
+        "release",
         "--phase",
         "pull-request",
         "--working-directory",

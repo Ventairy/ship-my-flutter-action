@@ -31526,6 +31526,7 @@ async function run() {
     const arguments_ = [
         "run",
         "smf_cli:smf",
+        "release",
         "--phase",
         selected,
         "--working-directory",
