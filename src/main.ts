@@ -99,24 +99,11 @@ function repository(): string {
   return `${parts[0]}/${parts[1]}`;
 }
 
-function selectedPlatform(selected: Phase): Platform | undefined {
+function selectedPlatform(): Platform | undefined {
   const value = process.env.INPUT_PLATFORM?.trim();
-  switch (selected) {
-    case Phase.pullRequest:
-      if (value) {
-        throw new Error("platform must be omitted for the pull-request phase.");
-      }
-      return undefined;
-    case Phase.releaseCandidate:
-    case Phase.ship:
-      if (value === Platform.ios || value === Platform.android) return value;
-      throw new Error(
-        `platform must be "ios" or "android" for the ${selected} phase.`,
-      );
-    default:
-      /* v8 ignore next -- phase() already narrows external input. */
-      return assertNever(selected);
-  }
+  if (!value) return undefined;
+  if (value === Platform.ios || value === Platform.android) return value;
+  throw new Error('platform must be "ios" or "android" when provided.');
 }
 
 function smfPath(): string | undefined {
@@ -257,22 +244,9 @@ function mapPullRequestOutputs(result: JsonObject): void {
 function releaseMatrix(
   result: JsonObject,
 ): Array<{ platform: Platform; version: string }> {
-  const values = result[ResultField.releases];
-  if (!Array.isArray(values) || values.length === 0) {
-    throw new Error(
-      'smf returned an invalid pull-request result: "releases" must be a ' +
-        "non-empty list.",
-    );
-  }
+  const values = releaseResults(result, "pull-request");
   const seen = new Set<Platform>();
-  return values.map((value) => {
-    if (value === null || Array.isArray(value) || typeof value !== "object") {
-      throw new Error(
-        "smf returned an invalid pull-request result: each release must be " +
-          "an object.",
-      );
-    }
-    const release = value as JsonObject;
+  return values.map((release) => {
     const releasePlatform = platform(release, "pull-request release");
     if (seen.has(releasePlatform)) {
       throw new Error(
@@ -291,25 +265,54 @@ function releaseMatrix(
   });
 }
 
+function releaseResults(result: JsonObject, context: string): JsonObject[] {
+  const values = result[ResultField.releases];
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(
+      `smf returned an invalid ${context} result: "releases" must be a ` +
+        "non-empty list.",
+    );
+  }
+  return values.map((value) => {
+    if (value === null || Array.isArray(value) || typeof value !== "object") {
+      throw new Error(
+        `smf returned an invalid ${context} result: each release must be ` +
+          "an object.",
+      );
+    }
+    return value as JsonObject;
+  });
+}
+
 function mapReleaseCandidateOutputs(result: JsonObject): void {
-  const selected = platform(result, Phase.releaseCandidate);
+  if (result[ResultField.phase] !== Phase.releaseCandidate) {
+    throw new Error(
+      'smf returned an invalid release-candidate result: "phase" must be ' +
+        '"release-candidate".',
+    );
+  }
+  const releases = releaseResults(result, Phase.releaseCandidate);
+  core.setOutput(OutputName.phase, Phase.releaseCandidate);
+  core.setOutput(OutputName.releases, JSON.stringify(releases));
+  if (releases.length !== 1) return;
+  const release = releases[0]!;
+  const selected = platform(release, Phase.releaseCandidate);
   const version = requiredString(
-    result,
+    release,
     ResultField.version,
     Phase.releaseCandidate,
   );
   const artifactId = requiredString(
-    result,
+    release,
     ResultField.artifactId,
     Phase.releaseCandidate,
   );
   const buildNumber = requiredString(
-    result,
+    release,
     ResultField.buildNumber,
     Phase.releaseCandidate,
   );
 
-  core.setOutput(OutputName.phase, Phase.releaseCandidate);
   core.setOutput(OutputName.platform, selected);
   core.setOutput(OutputName.version, version);
   core.setOutput(OutputName.artifactId, artifactId);
@@ -317,21 +320,34 @@ function mapReleaseCandidateOutputs(result: JsonObject): void {
 }
 
 function mapShipOutputs(result: JsonObject): void {
-  const selected = platform(result, Phase.ship);
-  const version = requiredString(result, ResultField.version, Phase.ship);
-  const artifactId = requiredString(result, ResultField.artifactId, Phase.ship);
+  if (result[ResultField.phase] !== Phase.ship) {
+    throw new Error(
+      'smf returned an invalid ship result: "phase" must be "ship".',
+    );
+  }
+  const releases = releaseResults(result, Phase.ship);
+  core.setOutput(OutputName.phase, Phase.ship);
+  core.setOutput(OutputName.releases, JSON.stringify(releases));
+  if (releases.length !== 1) return;
+  const release = releases[0]!;
+  const selected = platform(release, Phase.ship);
+  const version = requiredString(release, ResultField.version, Phase.ship);
+  const artifactId = requiredString(
+    release,
+    ResultField.artifactId,
+    Phase.ship,
+  );
   const buildNumber = requiredString(
-    result,
+    release,
     ResultField.buildNumber,
     Phase.ship,
   );
   const githubReleaseUrl = requiredString(
-    result,
+    release,
     ResultField.githubReleaseUrl,
     Phase.ship,
   );
 
-  core.setOutput(OutputName.phase, Phase.ship);
   core.setOutput(OutputName.platform, selected);
   core.setOutput(OutputName.version, version);
   core.setOutput(OutputName.artifactId, artifactId);
@@ -365,7 +381,7 @@ function assertNever(value: never): never {
 export async function run(): Promise<void> {
   maskSensitiveInputs();
   const selected = phase();
-  const targetPlatform = selectedPlatform(selected);
+  const targetPlatform = selectedPlatform();
   if (
     selected === Phase.releaseCandidate &&
     targetPlatform === Platform.ios &&
@@ -384,7 +400,6 @@ export async function run(): Promise<void> {
   const arguments_ = [
     "run",
     "smf_cli:smf",
-    "action",
     "--phase",
     selected,
     "--working-directory",

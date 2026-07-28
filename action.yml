@@ -11,7 +11,7 @@ inputs:
     description: "Workflow phase: pull-request, release-candidate, or ship."
     required: true
   platform:
-    description: Platform for release-candidate or ship (ios or android).
+    description: Optional platform filter for any phase (ios or android).
     required: false
   smf-path:
     description: Explicit app/smf directory when the repository contains multiple apps.
