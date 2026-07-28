@@ -39,10 +39,13 @@ afterEach(() => {
 
 it("runs the vendored Dart planner through the native Action adapter", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "smf-action-dart-"));
+  const origin = await fs.mkdtemp(path.join(os.tmpdir(), "smf-action-origin-"));
   try {
     const dart = await dartExecutable();
     process.env.CI = "true";
+    await exec("git", ["init", "--bare"], { cwd: origin });
     await fs.mkdir(path.join(root, "ios"));
+    await fs.writeFile(path.join(root, "ios", ".keep"), "");
     await fs.writeFile(
       path.join(root, "pubspec.yaml"),
       "name: example\nversion: 1.0.0+1\n",
@@ -69,6 +72,11 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     await exec("git", ["commit", "-m", "chore: configure releases"], {
       cwd: root,
     });
+    await exec("git", ["remote", "add", "origin", origin], { cwd: root });
+    await exec("git", ["push", "-u", "origin", "main"], { cwd: root });
+    await exec("git", ["symbolic-ref", "HEAD", "refs/heads/main"], {
+      cwd: origin,
+    });
 
     const output = path.join(root, "github-output.txt");
     await fs.writeFile(output, "");
@@ -86,6 +94,9 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
 
     expect(await fs.readFile(output, "utf8")).toMatch(/^phase<<.+\nnoop\n.+$/m);
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await Promise.all([
+      fs.rm(root, { recursive: true, force: true }),
+      fs.rm(origin, { recursive: true, force: true }),
+    ]);
   }
 }, 30_000);

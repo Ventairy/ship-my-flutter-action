@@ -21,6 +21,7 @@ final class RepositoryValidator {
     final changelog = await SmfState.changelog(paths.directory);
     await SmfState.storeReleaseNotes(paths.directory);
     await _validateStatePaths(paths);
+    await _validateHooks(paths);
     await _validateUniqueAppId(paths, config);
 
     if (config.enabledPlatforms.isNotEmpty) {
@@ -69,12 +70,44 @@ final class RepositoryValidator {
       final value = await SmfFileSystem.readYaml(
         p.join(directory, SmfPaths.configFileName),
       );
-      final siblingAppId = value is Map<Object?, Object?> ? value['app_id'] : null;
+      final siblingAppId = value is Map<String, Object?> ? value['app_id'] : null;
       SmfError.check(
         siblingAppId != config.appId,
         'app_id "${config.appId}" is also used by '
             '${p.relative(p.dirname(directory), from: paths.repositoryRoot)}.',
         'APP_ID_CONFLICT',
+      );
+    }
+  }
+
+  static Future<void> _validateHooks(SmfPaths paths) async {
+    for (final hookPath in <String>[
+      paths.beforeCreatePrHook,
+      paths.beforeBuildHook,
+    ]) {
+      final type = await FileSystemEntity.type(
+        hookPath,
+        followLinks: false,
+      );
+      if (type == FileSystemEntityType.notFound) continue;
+      final relativePath = p.relative(
+        hookPath,
+        from: paths.repositoryRoot,
+      );
+      SmfError.check(
+        type == FileSystemEntityType.file,
+        '$relativePath must be a regular Dart file and must not be a '
+            'symbolic link.',
+        'INVALID_HOOK_FILE',
+      );
+      SmfError.check(
+        (await GitClient(root: paths.repositoryRoot).run(<String>[
+          'ls-files',
+          '--error-unmatch',
+          relativePath,
+        ], allowFailure: true)).isNotEmpty,
+        '$relativePath must be committed before SMF can execute it.',
+        'UNTRACKED_HOOK',
       );
     }
   }
@@ -105,13 +138,14 @@ final class RepositoryValidator {
       repositoryRoot: repositoryRoot,
       projectRoot: projectRoot,
     );
-    SmfError.check(
-      lockfile != null,
-      'No committed pubspec.lock exists at the Flutter project or workspace '
-          'root.',
-      'LOCKFILE_NOT_FOUND',
-    );
-    final relativeLockfile = p.relative(lockfile!, from: repositoryRoot);
+    if (lockfile == null) {
+      throw const SmfError(
+        'No committed pubspec.lock exists at the Flutter project or workspace '
+            'root.',
+        'LOCKFILE_NOT_FOUND',
+      );
+    }
+    final relativeLockfile = p.relative(lockfile, from: repositoryRoot);
     SmfError.check(
       (await GitClient(root: repositoryRoot).run(<String>[
         'ls-files',

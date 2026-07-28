@@ -100,14 +100,14 @@ final class AndroidCandidateOptions {
 final class AndroidCandidate {
   const AndroidCandidate._();
 
-  static Future<CandidateIntent?> _matchingIntent(
+  static Future<ReleaseCandidateIntent?> _matchingIntent(
     String intentPath, {
     required String fingerprint,
     required String packageName,
     required String version,
   }) async {
     if (!(await SmfFileSystem.exists(intentPath))) return null;
-    final intent = await CandidateIntent.read(intentPath);
+    final intent = await ReleaseCandidateIntent.read(intentPath);
     if (intent.platform != Platform.android ||
         intent.version != version ||
         intent.applicationId != packageName ||
@@ -154,7 +154,7 @@ final class AndroidCandidate {
   static Future<void> _recordIntent({
     required String repositoryRoot,
     required String intentPath,
-    required CandidateIntent intent,
+    required ReleaseCandidateIntent intent,
     required bool commitIntent,
     required GitHubContext? github,
   }) async {
@@ -361,8 +361,16 @@ final class AndroidCandidate {
                   )
                   .firstOrNull;
         if (uploaded != null) {
+          final matchingIntent = previousIntent;
+          if (matchingIntent == null) {
+            throw const SmfError(
+              'Google Play matched a candidate build without a recorded '
+                  'candidate intent.',
+              'CANDIDATE_INTENT_MISSING',
+            );
+          }
           SmfError.check(
-            uploaded.sha256 == previousIntent!.artifactSha256,
+            uploaded.sha256 == matchingIntent.artifactSha256,
             'Google Play contains versionCode $intentVersionCode, but its '
                 'bundle checksum does not match the committed candidate '
                 'intent.',
@@ -420,7 +428,7 @@ final class AndroidCandidate {
             await signing.cleanup();
           }
           final localSha256 = await FileDigest.sha256(aabPath);
-          uploadIntent = CandidateIntent(
+          uploadIntent = ReleaseCandidateIntent(
             platform: Platform.android,
             version: state.version,
             buildNumber: nextVersionCode.toString(),
@@ -449,7 +457,14 @@ final class AndroidCandidate {
             'GOOGLE_PLAY_BUNDLE_MISMATCH',
           );
         }
-        final finalizedIntent = uploadIntent!;
+        final finalizedIntent = uploadIntent;
+        if (finalizedIntent == null) {
+          throw const SmfError(
+            'Google Play candidate creation completed without a recorded '
+                'candidate intent.',
+            'CANDIDATE_INTENT_MISSING',
+          );
+        }
         final versionCode = uploaded.versionCode;
         final notes = await SmfState.storeReleaseNotes(paths.directory);
         for (final testingTrack in testingTracks) {

@@ -40,7 +40,7 @@ final class ReleasePullRequest {
     await gitClient.authenticated(<String>[
       'fetch',
       'origin',
-      config.targetBranch,
+      'refs/heads/${config.targetBranch}:refs/remotes/origin/${config.targetBranch}',
     ], token);
     final remoteBranch = await gitClient.authenticated(<String>[
       'ls-remote',
@@ -49,7 +49,11 @@ final class ReleasePullRequest {
       'refs/heads/$branch',
     ], token);
     if (remoteBranch.isNotEmpty) {
-      await gitClient.authenticated(<String>['fetch', 'origin', branch], token);
+      await gitClient.authenticated(<String>[
+        'fetch',
+        'origin',
+        'refs/heads/$branch:refs/remotes/origin/$branch',
+      ], token);
       await gitClient.run(<String>['checkout', '-B', branch, 'origin/$branch']);
       try {
         await gitClient.run(<String>[
@@ -98,7 +102,8 @@ final class ReleasePullRequest {
         'DIRTY_WORKTREE',
       );
     }
-    final api = githubApi ?? GitHubRestApi(context: context);
+    GitHubRestApi? ownedApi;
+    final api = githubApi ?? (ownedApi = GitHubRestApi(context: context));
     final startingBranch = await gitClient.currentBranch();
     await gitClient.configureBotIdentity();
     late final String branch;
@@ -183,8 +188,14 @@ final class ReleasePullRequest {
         pullRequestNumber: pull.number,
       );
     } finally {
-      if (await gitClient.isClean() && startingBranch.isNotEmpty && await gitClient.currentBranch() != startingBranch) {
-        await gitClient.run(<String>['checkout', startingBranch]);
+      try {
+        if (await gitClient.isClean() &&
+            startingBranch.isNotEmpty &&
+            await gitClient.currentBranch() != startingBranch) {
+          await gitClient.run(<String>['checkout', startingBranch]);
+        }
+      } finally {
+        ownedApi?.close();
       }
     }
   }
@@ -195,12 +206,18 @@ final class ReleasePullRequest {
     required SmfConfig config,
     GitHubApi? githubApi,
   }) async {
-    final pulls = await (githubApi ?? GitHubRestApi(context: context)).listPullRequests(
-      state: 'all',
-      head: '${context.owner}:${ReleaseReference.branch(config.appId)}',
-      base: config.targetBranch,
-      perPage: 10,
-    );
-    return pulls.isEmpty ? null : pulls.first.number;
+    GitHubRestApi? ownedApi;
+    final api = githubApi ?? (ownedApi = GitHubRestApi(context: context));
+    try {
+      final pulls = await api.listPullRequests(
+        state: 'all',
+        head: '${context.owner}:${ReleaseReference.branch(config.appId)}',
+        base: config.targetBranch,
+        perPage: 10,
+      );
+      return pulls.isEmpty ? null : pulls.first.number;
+    } finally {
+      ownedApi?.close();
+    }
   }
 }
