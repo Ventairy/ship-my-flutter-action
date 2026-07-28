@@ -63,12 +63,12 @@ the selected nested app and FVM/stable Flutter toolchain are consistent.
 
 ## Inputs
 
-| Input          | Phase          | Purpose                                        |
-| -------------- | -------------- | ---------------------------------------------- |
-| `phase`        | all            | `pull-request`, `release-candidate`, or `ship` |
-| `platform`     | candidate/ship | `ios` or `android`                             |
-| `smf-path`     | all            | Exact nested app `smf` directory               |
-| `github-token` | all            | PR, receipt, tag, and Release writes           |
+| Input          | Phase | Purpose                                        |
+| -------------- | ----- | ---------------------------------------------- |
+| `phase`        | all   | `pull-request`, `release-candidate`, or `ship` |
+| `platform`     | all   | Optional `ios` or `android` filter             |
+| `smf-path`     | all   | Exact nested app `smf` directory               |
+| `github-token` | all   | PR, receipt, tag, and Release writes           |
 
 Apple candidate/ship:
 

@@ -50,7 +50,6 @@ describe("action adapter", () => {
       [
         "run",
         "smf_cli:smf",
-        "action",
         "--phase",
         "pull-request",
         "--working-directory",
@@ -94,22 +93,30 @@ describe("action adapter", () => {
     );
   });
 
-  it("rejects a platform input for the pull-request phase", async () => {
+  it("forwards a platform filter for the pull-request phase", async () => {
     process.env.INPUT_PHASE = "pull-request";
     process.env.INPUT_PLATFORM = "ios";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({ phase: "noop" }),
+    });
 
-    await expect(run()).rejects.toThrow(
-      "platform must be omitted for the pull-request phase",
+    await run();
+
+    expect(getExecOutput).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining(["--platform", "ios"]),
+      expect.anything(),
     );
-    expect(getExecOutput).not.toHaveBeenCalled();
   });
 
-  it("requires a supported platform for direct platform phases", async () => {
+  it("rejects an unsupported optional platform", async () => {
     process.env.INPUT_PHASE = "ship";
     process.env.INPUT_PLATFORM = "web";
 
     await expect(run()).rejects.toThrow(
-      'platform must be "ios" or "android" for the ship phase',
+      'platform must be "ios" or "android" when provided',
     );
     expect(getExecOutput).not.toHaveBeenCalled();
   });
@@ -131,10 +138,15 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        platform: "ios",
-        version: "1.2.0",
-        artifactId: "build-7",
-        buildNumber: "7",
+        phase: "release-candidate",
+        releases: [
+          {
+            platform: "ios",
+            version: "1.2.0",
+            artifactId: "build-7",
+            buildNumber: "7",
+          },
+        ],
       }),
     });
 
@@ -153,10 +165,15 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        platform: "android",
-        version: "1.2.0",
-        artifactId: "42",
-        buildNumber: "42",
+        phase: "release-candidate",
+        releases: [
+          {
+            platform: "android",
+            version: "1.2.0",
+            artifactId: "42",
+            buildNumber: "42",
+          },
+        ],
       }),
     });
 
@@ -170,6 +187,41 @@ describe("action adapter", () => {
     expect(setOutput).toHaveBeenCalledWith("artifact-id", "42");
   });
 
+  it("maps multiple release candidates when platform is omitted", async () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+    process.env.INPUT_PHASE = "release-candidate";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        phase: "release-candidate",
+        releases: [
+          {
+            platform: "ios",
+            version: "1.2.0",
+            artifactId: "build-7",
+            buildNumber: "7",
+          },
+          {
+            platform: "android",
+            version: "2.0.0",
+            artifactId: "42",
+            buildNumber: "42",
+          },
+        ],
+      }),
+    });
+
+    await run();
+
+    expect(setOutput).toHaveBeenCalledWith("phase", "release-candidate");
+    expect(setOutput).toHaveBeenCalledWith(
+      "releases",
+      expect.stringContaining('"platform":"android"'),
+    );
+    expect(setOutput).not.toHaveBeenCalledWith("platform", expect.anything());
+  });
+
   it("maps ship results without implementing shipping logic", async () => {
     process.env.INPUT_PHASE = "ship";
     process.env.INPUT_PLATFORM = "ios";
@@ -177,12 +229,17 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        platform: "ios",
-        version: "2.0.0",
-        artifactId: "build-42",
-        buildNumber: "42",
-        githubReleaseUrl:
-          "https://github.com/ventairy/example/releases/ios-v2.0.0",
+        phase: "ship",
+        releases: [
+          {
+            platform: "ios",
+            version: "2.0.0",
+            artifactId: "build-42",
+            buildNumber: "42",
+            githubReleaseUrl:
+              "https://github.com/ventairy/example/releases/ios-v2.0.0",
+          },
+        ],
       }),
     });
 
@@ -285,9 +342,14 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        platform: "ios",
-        version: "1.2.0",
-        buildNumber: "7",
+        phase: "release-candidate",
+        releases: [
+          {
+            platform: "ios",
+            version: "1.2.0",
+            buildNumber: "7",
+          },
+        ],
       }),
     });
 
@@ -364,10 +426,15 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        platform: "android",
-        version: "2.0.0",
-        artifactId: "42",
-        buildNumber: "42",
+        phase: "ship",
+        releases: [
+          {
+            platform: "android",
+            version: "2.0.0",
+            artifactId: "42",
+            buildNumber: "42",
+          },
+        ],
       }),
     });
 
