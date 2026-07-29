@@ -2,6 +2,18 @@
 
 All notable changes to smf-action are documented here.
 
+## [1.2.0](https://github.com/Ventairy/smf-action/compare/v1.1.0...v1.2.0) (2026-07-29)
+
+
+### Features
+
+* install released SMF CLI ([34952a1](https://github.com/Ventairy/smf-action/commit/34952a1a9af7b01e6f22334d46a5ce8107f1f3e3))
+
+
+### Bug Fixes
+
+* publish Action tags atomically ([#15](https://github.com/Ventairy/smf-action/issues/15)) ([25b8023](https://github.com/Ventairy/smf-action/commit/25b8023d0a03be2558d7c313d3b9127adbbce274))
+
 ## [1.1.0](https://github.com/Ventairy/smf-action/compare/v1.0.0...v1.1.0) (2026-07-29)
 
 

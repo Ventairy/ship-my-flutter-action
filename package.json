@@ -1,6 +1,6 @@
 {
   "name": "smf-action",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Release Flutter apps with reviewable pull requests, tested store candidates, and exact-artifact delivery.",
   "type": "module",
   "private": true,
