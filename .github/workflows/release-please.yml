@@ -45,52 +45,6 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
-      - name: Update floating Action tags
-        if: steps.release.outputs.release_created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          MAJOR: ${{ steps.release.outputs.major }}
-          MINOR: ${{ steps.release.outputs.minor }}
-          PATCH: ${{ steps.release.outputs.patch }}
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        shell: bash
-        run: |
-          if [[ ! "$MAJOR" =~ ^[0-9]+$ || ! "$MINOR" =~ ^[0-9]+$ || ! "$PATCH" =~ ^[0-9]+$ ]]; then
-            echo "Release Please returned invalid semantic version outputs." >&2
-            exit 1
-          fi
-          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Release Please returned an invalid release SHA." >&2
-            exit 1
-          fi
-          if [[ "$RELEASE_TAG" != "v$MAJOR.$MINOR.$PATCH" ]]; then
-            echo "Release Please returned a tag that does not match its semantic version outputs." >&2
-            exit 1
-          fi
-
-          update_tag() {
-            local tag="$1"
-            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
-              gh api \
-                --method PATCH \
-                "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" \
-                -f sha="$RELEASE_SHA" \
-                -F force=true \
-                >/dev/null
-            else
-              gh api \
-                --method POST \
-                "repos/$GITHUB_REPOSITORY/git/refs" \
-                -f ref="refs/tags/$tag" \
-                -f sha="$RELEASE_SHA" \
-                >/dev/null
-            fi
-          }
-
-          update_tag "v$MAJOR"
-          update_tag "v$MAJOR.$MINOR"
-
       - name: Summarize Marketplace publication
         if: steps.release.outputs.release_created == 'true'
         env:
@@ -100,6 +54,6 @@ jobs:
         run: |
           {
             printf '## %s is ready to publish\n\n' "$RELEASE_TAG"
-            printf 'Release Please created a tested draft release and updated the compatible Action tags.\n\n'
+            printf 'Release Please created a tested draft release.\n\n'
             printf 'Open [%s](%s), select **Publish this Action to the GitHub Marketplace**, confirm **Publishing** and **Mobile CI**, then publish the release.\n' "$RELEASE_TAG" "$RELEASE_URL"
           } >> "$GITHUB_STEP_SUMMARY"
