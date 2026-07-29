@@ -1,6 +1,6 @@
 {
   "name": "smf-action",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "The official GitHub Action for smf.",
   "type": "module",
   "private": true,
