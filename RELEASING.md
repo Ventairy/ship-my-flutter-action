@@ -1,64 +1,88 @@
 # Releasing smf-action
 
-Release Please owns `package.json` versions, `CHANGELOG.md`, immutable semantic
-version tags, and GitHub Releases. The Action is not published to npm; users
-consume the committed `action.yml`, `dist`, and vendored SMF Dart workspace from a Git
-ref.
+Release Please owns the version in `package.json`, `CHANGELOG.md`, immutable
+`vX.Y.Z` tags, draft GitHub Releases, and the moving `vX` and `vX.Y` Action
+tags. The Action is not published to npm. Consumers run the committed
+`action.yml`, `dist`, and vendored SMF workspace from a Git ref.
 
-## Release credential
+## One-time repository setup
 
-The Ventairy organization prevents the default `GITHUB_TOKEN` from opening pull
-requests. Add a repository secret named `RELEASE_PLEASE_TOKEN` before enabling
-releases. If it is missing or invalid, Release Please fails so the broken release
-configuration remains visible.
+Add a repository secret named `RELEASE_PLEASE_TOKEN`. Use a fine-grained token
+limited to this repository with:
 
-Use a fine-grained personal access token limited to this repository and grant:
+- Actions: read and write;
+- Contents: read and write;
+- Issues: read and write;
+- Pull requests: read and write.
 
-- Actions: read and write, to dispatch CI for the generated release PR;
-- Contents: read and write, to update versions, tags, and GitHub Releases;
-- Issues: read and write, for Release Please's release metadata;
-- Pull requests: read and write, to open and update the release PR.
+The token lets Release Please-created pull requests and releases trigger the
+repository's normal workflows. Set an expiration and rotate it as repository
+administration. Do not use a broad developer CLI token.
 
-Never reuse a broad developer CLI token. Set an explicit expiration and treat
-token creation, rotation, and revocation as repository administration.
+Before the first Marketplace release:
 
-A GitHub App is also suitable, but do not store an installation token in
-`RELEASE_PLEASE_TOKEN`: installation tokens expire after one hour. Supporting a
-GitHub App requires storing its App credentials and changing the workflow to
-[mint a fresh installation token for each
-run](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow).
+1. Accept the GitHub Marketplace Developer Agreement for the repository owner.
+2. Enable two-factor authentication for the publishing account.
+3. Use `Publishing` as the primary Marketplace category and `Mobile CI` as the
+   secondary category.
+
+GitHub does not expose a supported public API for the Marketplace publication
+flag or categories. Do not automate its private web endpoints.
 
 ## Release flow
 
-1. Use Conventional Commits on `main`.
-2. CI validates Node 20, 22, and 24, the Dart adapter, the bundled `dist`,
-   dependency audits, and vendored-workspace provenance.
-3. After CI succeeds, Release Please opens or updates its release PR and
-   dispatches the same CI workflow on that PR branch.
-4. Review the proposed version, changelog, `package.json`, and manifest.
-5. Merge the release PR only after every required release gate passes.
-6. Release Please creates `vX.Y.Z` and its GitHub Release, then moves the `vX`
-   and `vX.Y` compatibility tags to the same tested commit.
+1. Merge Conventional Commits to `main`.
+2. Wait for CI to validate the Action on Node 20, 22, and 24, analyze the
+   vendored Dart runtime, run tests and audits, rebuild `dist`, and verify SMF
+   provenance.
+3. Review the Release Please pull request. Confirm the proposed version,
+   changelog, `package.json`, and `.release-please-manifest.json`.
+4. Merge the release pull request after all required checks pass.
+5. Wait for Release Please to create the `vX.Y.Z` tag and draft GitHub Release,
+   then confirm `vX` and `vX.Y` resolve to the same commit.
+6. Edit the draft release, select **Publish this Action to the GitHub
+   Marketplace**, confirm the categories, and publish it.
+7. Verify the release is visible on the
+   [SMF Marketplace listing](https://github.com/marketplace/actions/smf-flutter-release) and
+   that its installation snippet uses the new major tag.
 
-The first stable release must remain unmerged until the live Apple and Google
-Play acceptance tests succeed. When those gates are complete, include this footer in a
-Conventional Commit if the open release PR does not already target `1.0.0`:
+The draft is intentional: publishing it is the single operation that makes the
+GitHub Release and that Marketplace version public.
 
-```text
-Release-As: 1.0.0
+## Version policy
+
+- `fix:` produces a patch release.
+- `feat:` produces a minor release.
+- `feat!:` or a `BREAKING CHANGE:` footer produces a major release.
+- `Release-As: X.Y.Z` is reserved for an intentional one-off version override.
+
+Never edit `.release-please-manifest.json`, release versions, or generated tags
+by hand.
+
+## Verification
+
+For a release `vX.Y.Z`, verify the immutable and moving tags:
+
+```bash
+release_sha="$(git rev-list -n 1 vX.Y.Z)"
+test "$(git rev-list -n 1 vX)" = "$release_sha"
+test "$(git rev-list -n 1 vX.Y)" = "$release_sha"
+git show "vX.Y.Z:action.yml" >/dev/null
+git show "vX.Y.Z:dist/index.js" >/dev/null
+git show "vX.Y.Z:vendor/smf/SMF_COMMIT" >/dev/null
 ```
 
-Before merging the first stable release PR:
+Also confirm the GitHub Release is not a draft or prerelease and that CI passed
+for the release commit.
 
-- confirm the Action CI and public fixture are green;
-- exercise signing, upload, receipt recording, and exact-build promotion with
-  real Apple credentials;
-- exercise upload-key signing, internal-testing upload, receipt recording, and
-  same-`versionCode` production promotion with real Google Play credentials;
-- remove the README pre-release warning;
-- verify `dist` and `vendor/smf` match their reviewed sources;
-- confirm the generated tag is `v1.0.0`.
+## Recovery
 
-Do not manually edit `.release-please-manifest.json`, release versions, or
-generated release tags. A GitHub Marketplace publication is a separate manual
-choice on the semantic GitHub Release.
+Do not move or recreate an immutable `vX.Y.Z` tag. If a release is defective:
+
+1. document the impact in the GitHub Release;
+2. revert or fix the defect through a normal pull request;
+3. publish a new semantic release;
+4. let automation move only the compatible `vX` and `vX.Y` tags.
+
+If Marketplace publication was missed, edit that semantic GitHub Release,
+select the Marketplace checkbox and categories, then update the release.
