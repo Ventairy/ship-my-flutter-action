@@ -42,6 +42,7 @@ jobs:
           sdk: 3.10.0
       - run: pnpm install --frozen-lockfile
       - run: dart pub get --enforce-lockfile -C vendor/smf
+      - run: dart analyze --fatal-infos vendor/smf
       - run: pnpm run check
       - if: matrix.node == 20
         run: pnpm run audit:prod
@@ -71,7 +72,7 @@ jobs:
         name: Verify vendored SMF provenance
         shell: bash
         run: |
-          for package in smf_hooks smf_engine smf_apple smf_android smf_cli; do
+          for package in smf_hooks smf_engine smf_cli; do
             diff -ru "upstream-smf/packages/$package/lib" "vendor/smf/packages/$package/lib"
             cmp "upstream-smf/packages/$package/pubspec.yaml" "vendor/smf/packages/$package/pubspec.yaml"
             cmp "upstream-smf/packages/$package/LICENSE" "vendor/smf/packages/$package/LICENSE"

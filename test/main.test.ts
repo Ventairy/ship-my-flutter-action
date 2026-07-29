@@ -36,9 +36,9 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [{ platform: "ios", version: "1.2.0" }],
-        branch: "smf/release",
+        nextPhase: "release-candidate",
+        targets: [{ platform: "ios", version: "1.2.0" }],
+        releaseBranch: "smf/release",
         pullRequestNumber: 12,
       }),
     });
@@ -66,9 +66,9 @@ describe("action adapter", () => {
         silent: true,
       }),
     );
-    expect(setOutput).toHaveBeenCalledWith("phase", "release-candidate");
+    expect(setOutput).toHaveBeenCalledWith("next-phase", "release-candidate");
     expect(setOutput).toHaveBeenCalledWith(
-      "releases",
+      "targets",
       JSON.stringify([{ platform: "ios", version: "1.2.0" }]),
     );
     expect(setOutput).toHaveBeenCalledWith("pull-request-number", "12");
@@ -82,7 +82,7 @@ describe("action adapter", () => {
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
-      stdout: JSON.stringify({ phase: "noop" }),
+      stdout: JSON.stringify({ nextPhase: "noop" }),
     });
 
     await run();
@@ -100,7 +100,7 @@ describe("action adapter", () => {
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
-      stdout: JSON.stringify({ phase: "noop" }),
+      stdout: JSON.stringify({ nextPhase: "noop" }),
     });
 
     await run();
@@ -139,8 +139,7 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [
+        releaseCandidateReceipts: [
           {
             platform: "ios",
             version: "1.2.0",
@@ -153,7 +152,10 @@ describe("action adapter", () => {
 
     await run();
 
-    expect(setOutput).toHaveBeenCalledWith("phase", "release-candidate");
+    expect(setOutput).toHaveBeenCalledWith(
+      "candidates",
+      expect.stringContaining('"platform":"ios"'),
+    );
     expect(setOutput).toHaveBeenCalledWith("artifact-id", "build-7");
     expect(setOutput).toHaveBeenCalledWith("build-number", "7");
   });
@@ -166,8 +168,7 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [
+        releaseCandidateReceipts: [
           {
             platform: "android",
             version: "1.2.0",
@@ -195,8 +196,7 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [
+        releaseCandidateReceipts: [
           {
             platform: "ios",
             version: "1.2.0",
@@ -215,9 +215,8 @@ describe("action adapter", () => {
 
     await run();
 
-    expect(setOutput).toHaveBeenCalledWith("phase", "release-candidate");
     expect(setOutput).toHaveBeenCalledWith(
-      "releases",
+      "candidates",
       expect.stringContaining('"platform":"android"'),
     );
     expect(setOutput).not.toHaveBeenCalledWith("platform", expect.anything());
@@ -230,8 +229,7 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: [
+        shippedReleases: [
           {
             platform: "ios",
             version: "2.0.0",
@@ -246,7 +244,10 @@ describe("action adapter", () => {
 
     await run();
 
-    expect(setOutput).toHaveBeenCalledWith("phase", "ship");
+    expect(setOutput).toHaveBeenCalledWith(
+      "releases",
+      expect.stringContaining('"platform":"ios"'),
+    );
     expect(setOutput).toHaveBeenCalledWith("artifact-id", "build-42");
     expect(setOutput).toHaveBeenCalledWith(
       "release-url",
@@ -259,13 +260,13 @@ describe("action adapter", () => {
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
-      stdout: JSON.stringify({ phase: "noop" }),
+      stdout: JSON.stringify({ nextPhase: "noop" }),
     });
 
     await run();
 
     expect(setOutput).toHaveBeenCalledTimes(1);
-    expect(setOutput).toHaveBeenCalledWith("phase", "noop");
+    expect(setOutput).toHaveBeenCalledWith("next-phase", "noop");
   });
 
   it("maps a ship result without release-candidate-only outputs", async () => {
@@ -274,17 +275,20 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: [{ platform: "ios", version: "2.0.0" }],
+        nextPhase: "ship",
+        targets: [{ platform: "ios", version: "2.0.0" }],
       }),
     });
 
     await run();
 
-    expect(setOutput).toHaveBeenCalledWith("phase", "ship");
+    expect(setOutput).toHaveBeenCalledWith("next-phase", "ship");
     expect(setOutput).toHaveBeenCalledWith("platform", "ios");
     expect(setOutput).toHaveBeenCalledWith("version", "2.0.0");
-    expect(setOutput).not.toHaveBeenCalledWith("branch", expect.anything());
+    expect(setOutput).not.toHaveBeenCalledWith(
+      "release-branch",
+      expect.anything(),
+    );
   });
 
   it("rejects a pull-request result without an explicit supported phase", async () => {
@@ -296,7 +300,7 @@ describe("action adapter", () => {
     });
 
     await expect(run()).rejects.toThrow(
-      'invalid pull-request result: "phase" must be',
+      'invalid pull-request result: "nextPhase" must be',
     );
     expect(setOutput).not.toHaveBeenCalled();
   });
@@ -307,13 +311,13 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [{ platform: "ios", version: "1.2.0" }],
+        nextPhase: "release-candidate",
+        targets: [{ platform: "ios", version: "1.2.0" }],
       }),
     });
 
     await expect(run()).rejects.toThrow(
-      'invalid pull-request result: "branch" must be a non-empty string',
+      'invalid pull-request result: "releaseBranch" must be a non-empty string',
     );
   });
 
@@ -323,9 +327,9 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [{ platform: "ios", version: "1.2.0" }],
-        branch: "smf/release",
+        nextPhase: "release-candidate",
+        targets: [{ platform: "ios", version: "1.2.0" }],
+        releaseBranch: "smf/release",
         pullRequestNumber: "12",
       }),
     });
@@ -343,8 +347,7 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "release-candidate",
-        releases: [
+        releaseCandidateReceipts: [
           {
             platform: "ios",
             version: "1.2.0",
@@ -359,14 +362,90 @@ describe("action adapter", () => {
     );
   });
 
+  it("validates every release candidate when multiple platforms are returned", async () => {
+    process.env.INPUT_PHASE = "release-candidate";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        releaseCandidateReceipts: [
+          {
+            platform: "ios",
+            version: "1.2.0",
+            artifactId: "build-7",
+            buildNumber: "7",
+          },
+          {
+            platform: "android",
+            version: "2.0.0",
+            buildNumber: "42",
+          },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      'invalid release-candidate result: "artifactId" must be a non-empty string',
+    );
+  });
+
+  it("rejects duplicate release candidate platforms", async () => {
+    process.env.INPUT_PHASE = "release-candidate";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        releaseCandidateReceipts: [
+          {
+            platform: "android",
+            version: "2.0.0",
+            artifactId: "42",
+            buildNumber: "42",
+          },
+          {
+            platform: "android",
+            version: "2.0.1",
+            artifactId: "43",
+            buildNumber: "43",
+          },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      "duplicate android release-candidate results",
+    );
+  });
+
+  it("rejects a result that differs from the selected platform", async () => {
+    process.env.INPUT_PHASE = "release-candidate";
+    process.env.INPUT_PLATFORM = "android";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        releaseCandidateReceipts: [
+          {
+            platform: "ios",
+            version: "1.2.0",
+            artifactId: "build-7",
+            buildNumber: "7",
+          },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow("expected exactly one android result");
+  });
+
   it("rejects an unsupported platform result", async () => {
     process.env.INPUT_PHASE = "pull-request";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: [{ platform: "web", version: "2.0.0" }],
+        nextPhase: "ship",
+        targets: [{ platform: "web", version: "2.0.0" }],
       }),
     });
 
@@ -375,42 +454,42 @@ describe("action adapter", () => {
     );
   });
 
-  it("rejects a pull-request result with no releases", async () => {
+  it("rejects a pull-request result with no targets", async () => {
     process.env.INPUT_PHASE = "pull-request";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: [],
+        nextPhase: "ship",
+        targets: [],
       }),
     });
 
-    await expect(run()).rejects.toThrow('"releases" must be a non-empty list');
+    await expect(run()).rejects.toThrow('"targets" must be a non-empty list');
   });
 
-  it("rejects a pull-request result with a non-object release", async () => {
+  it("rejects a pull-request result with a non-object target", async () => {
     process.env.INPUT_PHASE = "pull-request";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: ["ios"],
+        nextPhase: "ship",
+        targets: ["ios"],
       }),
     });
 
-    await expect(run()).rejects.toThrow("each release must be an object");
+    await expect(run()).rejects.toThrow("each target must be an object");
   });
 
-  it("rejects duplicate platform releases", async () => {
+  it("rejects duplicate platform targets", async () => {
     process.env.INPUT_PHASE = "pull-request";
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: [
+        nextPhase: "ship",
+        targets: [
           { platform: "android", version: "1.0.0" },
           { platform: "android", version: "1.0.1" },
         ],
@@ -427,8 +506,7 @@ describe("action adapter", () => {
       exitCode: 0,
       stderr: "",
       stdout: JSON.stringify({
-        phase: "ship",
-        releases: [
+        shippedReleases: [
           {
             platform: "android",
             version: "2.0.0",
@@ -441,6 +519,91 @@ describe("action adapter", () => {
 
     await expect(run()).rejects.toThrow(
       'invalid ship result: "githubReleaseUrl" must be a non-empty string',
+    );
+  });
+
+  it("validates every shipped release when multiple platforms are returned", async () => {
+    process.env.INPUT_PHASE = "ship";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        shippedReleases: [
+          {
+            platform: "ios",
+            version: "2.0.0",
+            artifactId: "build-42",
+            buildNumber: "42",
+            githubReleaseUrl:
+              "https://github.com/ventairy/example/releases/ios-v2.0.0",
+          },
+          {
+            platform: "android",
+            version: "2.0.0",
+            artifactId: "42",
+            buildNumber: "42",
+          },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      'invalid ship result: "githubReleaseUrl" must be a non-empty string',
+    );
+  });
+
+  it("rejects duplicate shipped release platforms", async () => {
+    process.env.INPUT_PHASE = "ship";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        shippedReleases: [
+          {
+            platform: "ios",
+            version: "2.0.0",
+            artifactId: "build-42",
+            buildNumber: "42",
+            githubReleaseUrl:
+              "https://github.com/ventairy/example/releases/ios-v2.0.0",
+          },
+          {
+            platform: "ios",
+            version: "2.0.1",
+            artifactId: "build-43",
+            buildNumber: "43",
+            githubReleaseUrl:
+              "https://github.com/ventairy/example/releases/ios-v2.0.1",
+          },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow("duplicate ios ship results");
+  });
+
+  it("rejects a shipped release that differs from the selected platform", async () => {
+    process.env.INPUT_PHASE = "ship";
+    process.env.INPUT_PLATFORM = "android";
+    getExecOutput.mockResolvedValue({
+      exitCode: 0,
+      stderr: "",
+      stdout: JSON.stringify({
+        shippedReleases: [
+          {
+            platform: "ios",
+            version: "2.0.0",
+            artifactId: "build-42",
+            buildNumber: "42",
+            githubReleaseUrl:
+              "https://github.com/ventairy/example/releases/ios-v2.0.0",
+          },
+        ],
+      }),
+    });
+
+    await expect(run()).rejects.toThrow(
+      "invalid ship result: expected exactly one android result",
     );
   });
 
@@ -527,7 +690,7 @@ describe("action adapter", () => {
     getExecOutput.mockResolvedValue({
       exitCode: 0,
       stderr: "",
-      stdout: JSON.stringify({ phase: "noop" }),
+      stdout: JSON.stringify({ nextPhase: "noop" }),
     });
 
     await run();

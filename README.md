@@ -51,7 +51,7 @@ If `smf/config.yaml` exists but the generated workflow was removed,
 The generated workflow:
 
 - plans on Ubuntu;
-- uses a release matrix from the Action’s `releases` output;
+- uses a release matrix from the Action’s `targets` output;
 - runs iOS candidates on macOS;
 - runs Android candidates on Ubuntu;
 - serializes candidate jobs so both receipts can be committed safely to the
@@ -95,11 +95,11 @@ The generated workflow supplies these from secrets in GitHub Environment
 
 ## Outputs
 
-| Phase               | Outputs                                                                                                                           |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `pull-request`      | `phase`, `releases` JSON matrix, optional `branch`, `pull-request-number`; `platform`/`version` only when one release is selected |
-| `release-candidate` | `phase`, `platform`, `version`, `artifact-id`, `build-number`                                                                     |
-| `ship`              | `phase`, `platform`, `version`, `artifact-id`, `build-number`, `release-url`                                                      |
+| Phase               | Outputs                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `pull-request`      | `next-phase`, `targets` JSON matrix, optional `release-branch`, `pull-request-number`; `platform`/`version` when one target is selected |
+| `release-candidate` | `candidates` JSON list; `platform`, `version`, `artifact-id`, and `build-number` when one candidate is produced                         |
+| `ship`              | `releases` JSON list; `platform`, `version`, `artifact-id`, `build-number`, and `release-url` when one release is produced              |
 
 `artifact-id` is the App Store Connect build ID for iOS and Google Play
 `versionCode` for Android.

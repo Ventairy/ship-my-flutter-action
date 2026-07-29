@@ -12,17 +12,21 @@ requests. Add a repository secret named `RELEASE_PLEASE_TOKEN` before enabling
 releases. If it is missing or invalid, Release Please fails so the broken release
 configuration remains visible.
 
-Prefer a GitHub App installation token for long-lived automation. A
-fine-grained personal access token is also supported when it is limited to this
-repository and grants:
+Use a fine-grained personal access token limited to this repository and grant:
 
 - Actions: read and write, to dispatch CI for the generated release PR;
 - Contents: read and write, to update versions, tags, and GitHub Releases;
 - Issues: read and write, for Release Please's release metadata;
 - Pull requests: read and write, to open and update the release PR.
 
-Never reuse a broad developer CLI token. Treat token creation, rotation, and
-revocation as repository administration.
+Never reuse a broad developer CLI token. Set an explicit expiration and treat
+token creation, rotation, and revocation as repository administration.
+
+A GitHub App is also suitable, but do not store an installation token in
+`RELEASE_PLEASE_TOKEN`: installation tokens expire after one hour. Supporting a
+GitHub App requires storing its App credentials and changing the workflow to
+[mint a fresh installation token for each
+run](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow).
 
 ## Release flow
 
