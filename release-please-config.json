@@ -6,6 +6,7 @@
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",
+      "draft": true,
       "release-type": "node"
     }
   }

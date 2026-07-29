@@ -16,6 +16,11 @@ const releaseWorkflowPath = path.resolve(
   "workflows",
   "release-please.yml",
 );
+const releasePleaseConfigPath = path.resolve(
+  import.meta.dirname,
+  "..",
+  "release-please-config.json",
+);
 const resolveProjectPath = path.resolve(
   import.meta.dirname,
   "..",
@@ -61,7 +66,7 @@ describe("composite action contract", () => {
           Array.isArray(document.runs?.steps) && document.runs.steps.length > 0,
       })),
     ).toEqual([
-      { name: "SMF", using: "composite", hasSteps: true },
+      { name: "SMF Flutter Release", using: "composite", hasSteps: true },
       { name: "Resolve SMF project", using: "composite", hasSteps: true },
       { name: "Set up consumer Flutter", using: "composite", hasSteps: true },
     ]);
@@ -70,8 +75,9 @@ describe("composite action contract", () => {
   it("describes app-scoped release automation", async () => {
     const action = await fs.readFile(actionPath, "utf8");
 
-    expect(action).toContain("Open app-scoped Flutter release PRs");
-    expect(action).not.toContain("Open shared Flutter release PRs");
+    expect(action).toContain(
+      "Release Flutter apps with reviewable pull requests",
+    );
   });
 
   it("leaves Flutter installation to the consumer workflow", async () => {
@@ -106,6 +112,21 @@ describe("composite action contract", () => {
     const workflow = await fs.readFile(releaseWorkflowPath, "utf8");
 
     expect(workflow).not.toContain("gh workflow run");
+  });
+
+  it("prepares draft releases for Marketplace publication", async () => {
+    const config: unknown = JSON.parse(
+      await fs.readFile(releasePleaseConfigPath, "utf8"),
+    );
+
+    expect(config).toMatchObject({
+      packages: {
+        ".": {
+          draft: true,
+          "release-type": "node",
+        },
+      },
+    });
   });
 
   it("exposes explicit SMF app selection without app-path configuration", async () => {

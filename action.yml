@@ -1,5 +1,5 @@
-name: SMF
-description: Open app-scoped Flutter release PRs, publish store candidates, and ship each exact tested platform build.
+name: SMF Flutter Release
+description: Release Flutter apps with reviewable pull requests, tested iOS and Android candidates, and exact-artifact delivery.
 author: Ventairy
 
 branding:

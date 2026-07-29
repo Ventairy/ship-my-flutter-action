@@ -51,15 +51,21 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           MAJOR: ${{ steps.release.outputs.major }}
           MINOR: ${{ steps.release.outputs.minor }}
+          PATCH: ${{ steps.release.outputs.patch }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
         shell: bash
         run: |
-          if [[ ! "$MAJOR" =~ ^[0-9]+$ || ! "$MINOR" =~ ^[0-9]+$ ]]; then
-            echo "Release Please returned invalid major or minor outputs." >&2
+          if [[ ! "$MAJOR" =~ ^[0-9]+$ || ! "$MINOR" =~ ^[0-9]+$ || ! "$PATCH" =~ ^[0-9]+$ ]]; then
+            echo "Release Please returned invalid semantic version outputs." >&2
             exit 1
           fi
           if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Release Please returned an invalid release SHA." >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_TAG" != "v$MAJOR.$MINOR.$PATCH" ]]; then
+            echo "Release Please returned a tag that does not match its semantic version outputs." >&2
             exit 1
           fi
 
@@ -84,3 +90,16 @@ jobs:
 
           update_tag "v$MAJOR"
           update_tag "v$MAJOR.$MINOR"
+
+      - name: Summarize Marketplace publication
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASE_URL: ${{ steps.release.outputs.html_url }}
+        shell: bash
+        run: |
+          {
+            printf '## %s is ready to publish\n\n' "$RELEASE_TAG"
+            printf 'Release Please created a tested draft release and updated the compatible Action tags.\n\n'
+            printf 'Open [%s](%s), select **Publish this Action to the GitHub Marketplace**, confirm **Publishing** and **Mobile CI**, then publish the release.\n' "$RELEASE_TAG" "$RELEASE_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
