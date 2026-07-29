@@ -9,6 +9,13 @@ import { parse } from "yaml";
 const exec = promisify(execFile);
 
 const actionPath = path.resolve(import.meta.dirname, "..", "action.yml");
+const releaseWorkflowPath = path.resolve(
+  import.meta.dirname,
+  "..",
+  ".github",
+  "workflows",
+  "release-please.yml",
+);
 const resolveProjectPath = path.resolve(
   import.meta.dirname,
   "..",
@@ -93,6 +100,12 @@ describe("composite action contract", () => {
     expect(action).not.toContain(
       "Workflow phase: plan, candidate, or promote.",
     );
+  });
+
+  it("targets this repository when dispatching release PR validation", async () => {
+    const workflow = await fs.readFile(releaseWorkflowPath, "utf8");
+
+    expect(workflow).toContain('--repo "$GITHUB_REPOSITORY"');
   });
 
   it("exposes explicit SMF app selection without app-path configuration", async () => {
