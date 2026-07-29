@@ -102,10 +102,10 @@ describe("composite action contract", () => {
     );
   });
 
-  it("targets this repository when dispatching release PR validation", async () => {
+  it("leaves release PR validation to the normal pull request checks", async () => {
     const workflow = await fs.readFile(releaseWorkflowPath, "utf8");
 
-    expect(workflow).toContain('--repo "$GITHUB_REPOSITORY"');
+    expect(workflow).not.toContain("gh workflow run");
   });
 
   it("exposes explicit SMF app selection without app-path configuration", async () => {
