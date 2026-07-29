@@ -1,0 +1,105 @@
+name: Publish Action
+
+on:
+  release:
+    types:
+      - published
+
+concurrency:
+  group: publish-action
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-action-tags:
+    if: github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Validate semantic release tag
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Published Action releases must use a vMAJOR.MINOR.PATCH tag." >&2
+            exit 1
+          fi
+          printf 'major=%s\n' "${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+          printf 'minor=%s\n' "${BASH_REMATCH[2]}" >> "$GITHUB_ENV"
+          printf 'version=%s.%s.%s\n' \
+            "${BASH_REMATCH[1]}" \
+            "${BASH_REMATCH[2]}" \
+            "${BASH_REMATCH[3]}" \
+            >> "$GITHUB_ENV"
+
+      - name: Check out the published release
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - id: release
+        name: Verify published Action contents
+        shell: bash
+        run: |
+          actual_version="$(node --print "require('./package.json').version")"
+          if [[ "$actual_version" != "$version" ]]; then
+            echo "package.json version does not match the published release tag." >&2
+            exit 1
+          fi
+
+          for path in action.yml dist/index.js vendor/smf/SMF_COMMIT; do
+            if [[ ! -f "$path" ]]; then
+              echo "Published release is missing $path." >&2
+              exit 1
+            fi
+          done
+
+          release_sha="$(git rev-parse HEAD)"
+          if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve the published release commit." >&2
+            exit 1
+          fi
+          printf 'sha=%s\n' "$release_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Update compatible Action tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        shell: bash
+        run: |
+          update_tag() {
+            local tag="$1"
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+              gh api \
+                --method PATCH \
+                "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" \
+                -f sha="$RELEASE_SHA" \
+                -F force=true \
+                >/dev/null
+            else
+              gh api \
+                --method POST \
+                "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f ref="refs/tags/$tag" \
+                -f sha="$RELEASE_SHA" \
+                >/dev/null
+            fi
+          }
+
+          update_tag "v$major"
+          update_tag "v$major.$minor"
+
+      - name: Summarize published refs
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        shell: bash
+        run: |
+          {
+            printf '## %s published\n\n' "$RELEASE_TAG"
+            printf -- '- `v%s` → `%s`\n' "$major" "$RELEASE_SHA"
+            printf -- '- `v%s.%s` → `%s`\n' "$major" "$minor" "$RELEASE_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"

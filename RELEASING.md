@@ -1,9 +1,11 @@
 # Releasing smf-action
 
-Release Please owns the version in `package.json`, `CHANGELOG.md`, immutable
-`vX.Y.Z` tags, draft GitHub Releases, and the moving `vX` and `vX.Y` Action
-tags. The Action is not published to npm. Consumers run the committed
-`action.yml`, `dist`, and vendored SMF workspace from a Git ref.
+Release Please owns the version in `package.json`, `CHANGELOG.md`, and draft
+GitHub Releases. Publishing the draft creates the immutable `vX.Y.Z` tag, and
+the Publish Action workflow moves the compatible `vX` and `vX.Y` tags only
+after it verifies the published release. The Action is not published to npm.
+Consumers run the committed `action.yml`, `dist`, and vendored SMF workspace
+from a Git ref.
 
 ## One-time repository setup
 
@@ -38,16 +40,19 @@ flag or categories. Do not automate its private web endpoints.
 3. Review the Release Please pull request. Confirm the proposed version,
    changelog, `package.json`, and `.release-please-manifest.json`.
 4. Merge the release pull request after all required checks pass.
-5. Wait for Release Please to create the `vX.Y.Z` tag and draft GitHub Release,
-   then confirm `vX` and `vX.Y` resolve to the same commit.
-6. Edit the draft release, select **Publish this Action to the GitHub
+5. Wait for Release Please to create the draft GitHub Release.
+6. Edit the draft, select **Publish this Action to the GitHub
    Marketplace**, confirm the categories, and publish it.
-7. Verify the release is visible on the
+7. Wait for Publish Action to verify the release contents and move `vX` and
+   `vX.Y` to the immutable `vX.Y.Z` commit.
+8. Verify the release is visible on the
    [SMF Marketplace listing](https://github.com/marketplace/actions/smf-flutter-release) and
    that its installation snippet uses the new major tag.
 
 The draft is intentional: publishing it is the single operation that makes the
-GitHub Release and that Marketplace version public.
+GitHub Release, immutable semantic tag, and that Marketplace version public.
+Compatible Action tags do not move until the published release passes its
+contract checks.
 
 ## Version policy
 

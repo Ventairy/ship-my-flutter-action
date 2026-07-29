@@ -21,6 +21,13 @@ const releasePleaseConfigPath = path.resolve(
   "..",
   "release-please-config.json",
 );
+const publishActionWorkflowPath = path.resolve(
+  import.meta.dirname,
+  "..",
+  ".github",
+  "workflows",
+  "publish-action.yml",
+);
 const resolveProjectPath = path.resolve(
   import.meta.dirname,
   "..",
@@ -112,6 +119,7 @@ describe("composite action contract", () => {
     const workflow = await fs.readFile(releaseWorkflowPath, "utf8");
 
     expect(workflow).not.toContain("gh workflow run");
+    expect(workflow).not.toContain("Update floating Action tags");
   });
 
   it("prepares draft releases for Marketplace publication", async () => {
@@ -127,6 +135,16 @@ describe("composite action contract", () => {
         },
       },
     });
+  });
+
+  it("moves compatible Action tags only after publication", async () => {
+    const workflow = await fs.readFile(publishActionWorkflowPath, "utf8");
+
+    expect(workflow).toContain("types:\n      - published");
+    expect(workflow).toContain("github.event.release.prerelease == false");
+    expect(workflow).toContain("package.json version does not match");
+    expect(workflow).toContain('update_tag "v$major"');
+    expect(workflow).toContain('update_tag "v$major.$minor"');
   });
 
   it("exposes explicit SMF app selection without app-path configuration", async () => {
