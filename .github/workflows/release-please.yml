@@ -12,7 +12,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: write
   contents: write
   issues: write
   pull-requests: write
@@ -45,28 +44,6 @@ jobs:
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-
-      - name: Validate the release pull request
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          RELEASE_PRS: ${{ steps.release.outputs.prs }}
-        shell: bash
-        run: |
-          branch="$(jq -er '
-            if type == "array" and length == 1 then
-              .[0].headBranchName
-            else
-              error("expected exactly one release pull request")
-            end
-          ' <<<"$RELEASE_PRS")"
-          if [[ -z "$branch" ]]; then
-            echo "Release Please did not return a release PR branch." >&2
-            exit 1
-          fi
-          gh workflow run ci.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref "$branch"
 
       - name: Update floating Action tags
         if: steps.release.outputs.release_created == 'true'
