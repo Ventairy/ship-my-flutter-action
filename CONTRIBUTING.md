@@ -4,26 +4,20 @@ Install Node.js, pnpm 10, and Dart 3.10 or newer, then run:
 
 ```bash
 pnpm install --frozen-lockfile
-dart pub get --enforce-lockfile -C vendor/smf
+dart install smf_cli "$(cat SMF_CLI_VERSION)"
 pnpm run check
 ```
 
-Use Conventional Commits and keep source, tests, the vendored SMF workspace,
-its Action-owned deployment lockfile and `SMF_COMMIT` provenance record, and the
-checked-in `dist` bundle synchronized.
-CI resolves `SMF_COMMIT` from the public SMF repository and compares the
-vendored source byte-for-byte.
+Use Conventional Commits and keep source, tests, `SMF_CLI_VERSION`, and the
+checked-in `dist` bundle synchronized. CI installs that exact published CLI
+version and exercises it through the native Action adapter.
 
-To refresh SMF from the clean sibling checkout, run `vendor-smf` with Dart
-3.10. It copies the runtime workspace and generates the Action's committed
-lockfile:
-
-```bash
-pnpm run vendor-smf
-pnpm install --frozen-lockfile
-dart pub get --enforce-lockfile -C vendor/smf
-pnpm run check
-```
+The hourly `Sync SMF` workflow performs this refresh from the newest published
+stable `smf_cli` GitHub Release and opens or updates `automation/sync-smf`. It
+never merges or publishes the result. Review the exact CLI version and the
+Action-facing release type before merging its pull request. Its default
+`fix(runtime)` title intentionally requests a patch; change the pull request
+title when the Action contract requires a minor or major release.
 
 Never use production certificates, profiles, API keys, or app records in tests. Pull requests that change action inputs or outputs must update `action.yml`, tests, and the README together.
 

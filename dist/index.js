@@ -28229,18 +28229,6 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("util");
 /******/ }
 /******/ 
 /************************************************************************/
-/******/ /* webpack/runtime/compat get default export */
-/******/ (() => {
-/******/ 	// getDefaultExport function for compatibility with non-harmony modules
-/******/ 	__nccwpck_require__.n = (module) => {
-/******/ 		var getter = module && module.__esModule ?
-/******/ 			() => (module['default']) :
-/******/ 			() => (module);
-/******/ 		__nccwpck_require__.d(getter, { a: getter });
-/******/ 		return getter;
-/******/ 	};
-/******/ })();
-/******/ 
 /******/ /* webpack/runtime/define property getters */
 /******/ (() => {
 /******/ 	// define getter functions for harmony exports
@@ -31215,14 +31203,7 @@ function getIDToken(aud) {
  */
 
 //# sourceMappingURL=core.js.map
-;// CONCATENATED MODULE: external "node:path"
-const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
-var external_node_path_default = /*#__PURE__*/__nccwpck_require__.n(external_node_path_namespaceObject);
-// EXTERNAL MODULE: external "node:url"
-var external_node_url_ = __nccwpck_require__(3136);
 ;// CONCATENATED MODULE: ./src/main.ts
-
-
 
 
 var ReleasePhase;
@@ -31334,15 +31315,10 @@ function childEnvironment() {
     }
     return environment;
 }
-function runtimeDirectory() {
-    const actionPath = process.env.GITHUB_ACTION_PATH ??
-        external_node_path_default().resolve(external_node_path_default().dirname((0,external_node_url_.fileURLToPath)(import.meta.url)), "..");
-    return external_node_path_default().join(actionPath, "vendor", "smf");
-}
-function dartExecutable() {
-    const value = process.env.SMF_DART?.trim();
+function smfExecutable() {
+    const value = process.env.SMF_EXECUTABLE?.trim();
     if (!value) {
-        throw new Error("The smf Dart toolchain is missing.");
+        throw new Error("The installed smf CLI executable is missing.");
     }
     return value;
 }
@@ -31543,15 +31519,13 @@ async function run() {
     const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
     const repositoryName = repository();
     const selectedSmfPath = smfPath();
-    const executable = dartExecutable();
+    const executable = smfExecutable();
     const environment = childEnvironment();
     const consumerPath = process.env.SMF_CONSUMER_PATH;
     if (consumerPath)
         environment.PATH = consumerPath;
     info(`Running ${selected} for ${repositoryName}`);
     const arguments_ = [
-        "run",
-        "smf_cli:smf",
         "release",
         "--phase",
         selected,
@@ -31567,7 +31541,7 @@ async function run() {
         arguments_.push("--platform", targetPlatform);
     }
     const result = await getExecOutput(executable, arguments_, {
-        cwd: runtimeDirectory(),
+        cwd: repositoryRoot,
         env: environment,
         silent: true,
         ignoreReturnCode: true,

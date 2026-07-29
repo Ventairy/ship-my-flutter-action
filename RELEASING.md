@@ -4,8 +4,8 @@ Release Please owns the version in `package.json`, `CHANGELOG.md`, and draft
 GitHub Releases. Publishing the draft creates the immutable `vX.Y.Z` tag, and
 the Publish Action workflow moves the compatible `vX` and `vX.Y` tags only
 after it verifies the published release. The Action is not published to npm.
-Consumers run the committed `action.yml`, `dist`, and vendored SMF workspace
-from a Git ref.
+Consumers run the committed `action.yml` and `dist` from a Git ref; the Action
+installs the exact published CLI version recorded in `SMF_CLI_VERSION`.
 
 ## One-time repository setup
 
@@ -33,19 +33,23 @@ flag or categories. Do not automate its private web endpoints.
 
 ## Release flow
 
-1. Merge Conventional Commits to `main`.
-2. Wait for CI to validate the Action on Node 20, 22, and 24, analyze the
-   vendored Dart runtime, run tests and audits, rebuild `dist`, and verify SMF
-   provenance.
-3. Review the Release Please pull request. Confirm the proposed version,
+1. For an upstream SMF release, review and merge the pull request created by
+   the hourly `Sync SMF` workflow. Confirm its exact CLI version and
+   Conventional Commit release type. The workflow may also be run manually
+   with a specific stable `smf_cli` tag.
+2. Merge other Conventional Commits to `main`.
+3. Wait for CI to validate the Action on Node 20, 22, and 24, install and
+   exercise the exact published SMF CLI, run tests and audits, and rebuild
+   `dist`.
+4. Review the Release Please pull request. Confirm the proposed version,
    changelog, `package.json`, and `.release-please-manifest.json`.
-4. Merge the release pull request after all required checks pass.
-5. Wait for Release Please to create the draft GitHub Release.
-6. Edit the draft, select **Publish this Action to the GitHub
+5. Merge the release pull request after all required checks pass.
+6. Wait for Release Please to create the draft GitHub Release.
+7. Edit the draft, select **Publish this Action to the GitHub
    Marketplace**, confirm the categories, and publish it.
-7. Wait for Publish Action to verify the release contents and move `vX` and
+8. Wait for Publish Action to verify the release contents and move `vX` and
    `vX.Y` to the immutable `vX.Y.Z` commit.
-8. Verify the release is visible on the
+9. Verify the release is visible on the
    [SMF Marketplace listing](https://github.com/marketplace/actions/smf-flutter-release) and
    that its installation snippet uses the new major tag.
 
@@ -74,7 +78,7 @@ test "$(git rev-list -n 1 vX)" = "$release_sha"
 test "$(git rev-list -n 1 vX.Y)" = "$release_sha"
 git show "vX.Y.Z:action.yml" >/dev/null
 git show "vX.Y.Z:dist/index.js" >/dev/null
-git show "vX.Y.Z:vendor/smf/SMF_COMMIT" >/dev/null
+git show "vX.Y.Z:SMF_CLI_VERSION" >/dev/null
 ```
 
 Also confirm the GitHub Release is not a draft or prerelease and that CI passed

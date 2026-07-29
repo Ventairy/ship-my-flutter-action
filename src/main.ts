@@ -1,7 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 type JsonObject = Record<string, unknown>;
 
@@ -126,17 +124,10 @@ function childEnvironment(): Record<string, string> {
   return environment;
 }
 
-function runtimeDirectory(): string {
-  const actionPath =
-    process.env.GITHUB_ACTION_PATH ??
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  return path.join(actionPath, "vendor", "smf");
-}
-
-function dartExecutable(): string {
-  const value = process.env.SMF_DART?.trim();
+function smfExecutable(): string {
+  const value = process.env.SMF_EXECUTABLE?.trim();
   if (!value) {
-    throw new Error("The smf Dart toolchain is missing.");
+    throw new Error("The installed smf CLI executable is missing.");
   }
   return value;
 }
@@ -463,14 +454,12 @@ export async function run(): Promise<void> {
   const repositoryRoot = process.env.GITHUB_WORKSPACE ?? process.cwd();
   const repositoryName = repository();
   const selectedSmfPath = smfPath();
-  const executable = dartExecutable();
+  const executable = smfExecutable();
   const environment = childEnvironment();
   const consumerPath = process.env.SMF_CONSUMER_PATH;
   if (consumerPath) environment.PATH = consumerPath;
   core.info(`Running ${selected} for ${repositoryName}`);
   const arguments_ = [
-    "run",
-    "smf_cli:smf",
     "release",
     "--phase",
     selected,
@@ -486,7 +475,7 @@ export async function run(): Promise<void> {
     arguments_.push("--platform", targetPlatform);
   }
   const result = await exec.getExecOutput(executable, arguments_, {
-    cwd: runtimeDirectory(),
+    cwd: repositoryRoot,
     env: environment,
     silent: true,
     ignoreReturnCode: true,

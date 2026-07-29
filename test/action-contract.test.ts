@@ -28,6 +28,13 @@ const publishActionWorkflowPath = path.resolve(
   "workflows",
   "publish-action.yml",
 );
+const syncSmfWorkflowPath = path.resolve(
+  import.meta.dirname,
+  "..",
+  ".github",
+  "workflows",
+  "sync-smf.yml",
+);
 const resolveProjectPath = path.resolve(
   import.meta.dirname,
   "..",
@@ -39,6 +46,11 @@ const setupFlutterPath = path.resolve(
   "..",
   "setup-flutter",
   "action.yml",
+);
+const smfCliVersionPath = path.resolve(
+  import.meta.dirname,
+  "..",
+  "SMF_CLI_VERSION",
 );
 
 type ActionDocument = {
@@ -101,7 +113,10 @@ describe("composite action contract", () => {
     expect(action).toContain("Preserve consumer toolchain");
     expect(action).toContain("dart-lang/setup-dart@");
     expect(action).toContain("SMF_DART:");
+    expect(action).toContain('"$SMF_DART" install smf_cli "$version"');
+    expect(action).toContain("SMF_EXECUTABLE:");
     expect(action).toContain("SMF_CONSUMER_PATH:");
+    expect(action).not.toContain("vendor/smf");
   });
 
   it("documents the complete workflow phase protocol", async () => {
@@ -145,6 +160,27 @@ describe("composite action contract", () => {
     expect(workflow).toContain("package.json version does not match");
     expect(workflow).toContain('update_tag "v$major"');
     expect(workflow).toContain('update_tag "v$major.$minor"');
+  });
+
+  it("opens a reviewed synchronization pull request for stable SMF releases", async () => {
+    const workflow = await fs.readFile(syncSmfWorkflowPath, "utf8");
+
+    expect(workflow).toContain('cron: "17 * * * *"');
+    expect(workflow).toContain('test("^smf_cli-v');
+    expect(workflow).toContain("^smf_cli-v([0-9]+\\.[0-9]+\\.[0-9]+)$");
+    expect(workflow).toContain("SMF_CLI_VERSION");
+    expect(workflow).toContain('dart install smf_cli "$RELEASED_VERSION"');
+    expect(workflow).toContain("pnpm run check");
+    expect(workflow).toContain('branch="automation/sync-smf"');
+    expect(workflow).toContain("gh pr create");
+    expect(workflow).not.toContain("gh release create");
+    expect(workflow).not.toContain("vendor/smf");
+  });
+
+  it("records one exact published SMF CLI version", async () => {
+    const version = (await fs.readFile(smfCliVersionPath, "utf8")).trim();
+
+    expect(version).toMatch(/^[0-9]+\.[0-9]+\.[0-9]+$/);
   });
 
   it("exposes explicit SMF app selection without app-path configuration", async () => {
