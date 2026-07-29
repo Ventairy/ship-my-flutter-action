@@ -45,7 +45,7 @@ runs:
       env:
         FVM_ROOT: ${{ inputs.fvm-root }}
       run: |
-        (cd "$FVM_ROOT" && fvm install)
+        (cd "$FVM_ROOT" && fvm install --skip-pub-get)
     - if: inputs.uses-fvm != 'true'
       uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
       with:

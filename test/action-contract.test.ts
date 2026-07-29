@@ -134,6 +134,7 @@ describe("composite action contract", () => {
     expect(setupFlutter).toContain("dart pub global activate fvm");
     expect(setupFlutter).toContain("FVM_CACHE_PATH=%s/fvm");
     expect(setupFlutter).toContain("path: ~/fvm/versions");
+    expect(setupFlutter).toContain("fvm install --skip-pub-get");
   });
 
   it("rejects an smf directory that resolves outside the repository", async () => {
