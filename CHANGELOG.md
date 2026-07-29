@@ -2,6 +2,18 @@
 
 All notable changes to smf-action are documented here.
 
+## [1.1.0](https://github.com/Ventairy/smf-action/compare/v1.0.0...v1.1.0) (2026-07-29)
+
+
+### Features
+
+* publish SMF through GitHub Marketplace ([#11](https://github.com/Ventairy/smf-action/issues/11)) ([896063a](https://github.com/Ventairy/smf-action/commit/896063aee437aa52f2ea4c0006a89c366298193c))
+
+
+### Bug Fixes
+
+* allow generated changelog formatting ([#13](https://github.com/Ventairy/smf-action/issues/13)) ([2447b2c](https://github.com/Ventairy/smf-action/commit/2447b2cad0034112964e31f6b7a411da4915bbdc))
+
 ## [1.0.0](https://github.com/Ventairy/smf-action/compare/v0.1.0...v1.0.0) (2026-07-29)
 
 ### ⚠ BREAKING CHANGES
