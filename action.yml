@@ -115,11 +115,35 @@ runs:
         fi
         printf 'dart=%s\n' "$dart_path" >> "$GITHUB_OUTPUT"
 
-    - name: Resolve smf dependencies
+    - name: Install SMF CLI
+      id: smf-cli
       shell: bash
       env:
         SMF_DART: ${{ steps.smf-toolchain.outputs.dart }}
-      run: '"$SMF_DART" pub get --enforce-lockfile -C "$GITHUB_ACTION_PATH/vendor/smf"'
+        SMF_DART_DATA_HOME: ${{ runner.temp }}/smf-cli
+      run: |
+        version="$(tr -d '\r\n' < "$GITHUB_ACTION_PATH/SMF_CLI_VERSION")"
+        if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "SMF_CLI_VERSION must contain one semantic version." >&2
+          exit 1
+        fi
+
+        DART_DATA_HOME="$SMF_DART_DATA_HOME" \
+          "$SMF_DART" install smf_cli "$version"
+        executable="$SMF_DART_DATA_HOME/install/bin/smf"
+        if [[ -x "$executable.exe" ]]; then
+          executable="$executable.exe"
+        fi
+        if [[ ! -x "$executable" ]]; then
+          echo "dart install did not produce the smf executable." >&2
+          exit 1
+        fi
+        actual_version="$("$executable" --version)"
+        if [[ "$actual_version" != "$version" ]]; then
+          echo "Installed smf CLI version does not match SMF_CLI_VERSION." >&2
+          exit 1
+        fi
+        printf 'executable=%s\n' "$executable" >> "$GITHUB_OUTPUT"
 
     - name: SMF
       id: run
@@ -129,7 +153,7 @@ runs:
         INPUT_PLATFORM: ${{ inputs.platform }}
         INPUT_SMF_PATH: ${{ inputs.smf-path }}
         SMF_GITHUB_TOKEN: ${{ inputs.github-token }}
-        SMF_DART: ${{ steps.smf-toolchain.outputs.dart }}
+        SMF_EXECUTABLE: ${{ steps.smf-cli.outputs.executable }}
         SMF_CONSUMER_PATH: ${{ steps.consumer-toolchain.outputs.path }}
         SMF_APP_STORE_CONNECT_KEY_ID: ${{ inputs.app-store-connect-key-id }}
         SMF_APP_STORE_CONNECT_ISSUER_ID: ${{ inputs.app-store-connect-issuer-id }}

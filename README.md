@@ -125,9 +125,10 @@ versions.
 Candidate jobs are serialized because they commit platform receipts to the same
 release branch. Ship jobs may run independently after merge.
 
-The Action carries a reviewed SMF Dart runtime. It does not depend on a globally
-installed CLI in CI, and it preserves the consumer Flutter/FVM toolchain used to
-build the app.
+The Action installs the exact published `smf_cli` version recorded by its
+release and executes its compiled `smf` command in isolation. It does not use a
+consumer-installed CLI, and it preserves the consumer Flutter/FVM toolchain
+used to build the app.
 
 ## Usage
 
@@ -155,8 +156,8 @@ Use the major tag to receive compatible v1 updates:
 - uses: Ventairy/smf-action@v1
 ```
 
-For immutable supply-chain review, pin the root Action and both bundled
-sub-actions to the same full commit:
+To pin the repository-owned Action code, use the same full commit for the root
+Action and both bundled sub-actions:
 
 ```yaml
 - uses: Ventairy/smf-action@<full-commit-sha>
@@ -165,6 +166,10 @@ sub-actions to the same full commit:
 ```
 
 Do not mix refs across these three Actions.
+
+The pinned Action installs the exact immutable `smf_cli` package version
+recorded by that commit. Pub resolves its compatible hosted dependencies during
+installation, so runners require access to pub.dev.
 
 ## Inputs
 

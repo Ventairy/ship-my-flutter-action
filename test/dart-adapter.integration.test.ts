@@ -7,27 +7,13 @@ import { afterEach, expect, it } from "vitest";
 
 const exec = promisify(execFile);
 const actionRoot = path.resolve(import.meta.dirname, "..");
-const runtimeRoot = path.join(actionRoot, "vendor", "smf");
 const originalEnvironment = { ...process.env };
 
-async function dartExecutable(): Promise<string> {
-  if (process.env.SMF_TEST_DART) {
-    return process.env.SMF_TEST_DART;
+async function smfExecutable(): Promise<string> {
+  if (process.env.SMF_TEST_EXECUTABLE) {
+    return process.env.SMF_TEST_EXECUTABLE;
   }
-  const command = (await exec("which", ["dart"])).stdout.trim();
-  const sdkBinary = path.resolve(
-    path.dirname(await fs.realpath(command)),
-    "cache",
-    "dart-sdk",
-    "bin",
-    "dart",
-  );
-  try {
-    await fs.access(sdkBinary);
-    return sdkBinary;
-  } catch {
-    return command;
-  }
+  return (await exec("which", ["smf"])).stdout.trim();
 }
 
 afterEach(() => {
@@ -37,11 +23,11 @@ afterEach(() => {
   Object.assign(process.env, originalEnvironment);
 });
 
-it("runs the vendored Dart planner through the native Action adapter", async () => {
+it("runs the installed SMF CLI through the native Action adapter", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "smf-action-dart-"));
   const origin = await fs.mkdtemp(path.join(os.tmpdir(), "smf-action-origin-"));
   try {
-    const dart = await dartExecutable();
+    const smf = await smfExecutable();
     process.env.CI = "true";
     await exec("git", ["init", "--bare"], { cwd: origin });
     await fs.mkdir(path.join(root, "ios"));
@@ -58,16 +44,9 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     });
     await exec("git", ["add", "."], { cwd: root });
     await exec("git", ["commit", "-m", "chore: bootstrap"], { cwd: root });
-    await exec(
-      dart,
-      [
-        path.join(runtimeRoot, "packages", "smf_cli", "bin", "smf.dart"),
-        "init",
-        "--ios-bundle-id",
-        "dev.example.app",
-      ],
-      { cwd: root },
-    );
+    await exec(smf, ["init", "--ios-bundle-id", "dev.example.app"], {
+      cwd: root,
+    });
     await exec("git", ["add", "."], { cwd: root });
     await exec("git", ["commit", "-m", "chore: configure releases"], {
       cwd: root,
@@ -86,8 +65,7 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     process.env.GITHUB_WORKSPACE = root;
     process.env.SMF_GITHUB_TOKEN = "not-a-real-token";
     process.env.INPUT_PHASE = "pull-request";
-    process.env.PATH = `${path.dirname(dart)}${path.delimiter}${process.env.PATH ?? ""}`;
-    process.env.SMF_DART = dart;
+    process.env.SMF_EXECUTABLE = smf;
     process.env.SMF_CONSUMER_PATH = process.env.PATH;
     const { run } = await import("../src/main.js");
     await run();

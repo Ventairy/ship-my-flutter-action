@@ -18,7 +18,7 @@ beforeEach(() => {
   process.env.GITHUB_ACTION_PATH = "/action";
   process.env.GITHUB_REPOSITORY = "ventairy/example";
   process.env.SMF_GITHUB_TOKEN = "token";
-  process.env.SMF_DART = "/toolchains/dart-3.10/bin/dart";
+  process.env.SMF_EXECUTABLE = "/tools/smf";
   process.env.SMF_CONSUMER_PATH = "/project/flutter/bin:/usr/bin";
 });
 
@@ -46,10 +46,8 @@ describe("action adapter", () => {
     await run();
 
     expect(getExecOutput).toHaveBeenCalledWith(
-      "/toolchains/dart-3.10/bin/dart",
+      "/tools/smf",
       [
-        "run",
-        "smf_cli:smf",
         "release",
         "--phase",
         "pull-request",
@@ -59,7 +57,7 @@ describe("action adapter", () => {
         "ventairy/example",
       ],
       expect.objectContaining({
-        cwd: "/action/vendor/smf",
+        cwd: "/workspace",
         env: expect.objectContaining({
           PATH: "/project/flutter/bin:/usr/bin",
         }),
@@ -88,7 +86,7 @@ describe("action adapter", () => {
     await run();
 
     expect(getExecOutput).toHaveBeenCalledWith(
-      "/toolchains/dart-3.10/bin/dart",
+      "/tools/smf",
       expect.arrayContaining(["--smf-path", "apps/mobile/smf"]),
       expect.anything(),
     );
@@ -662,11 +660,13 @@ describe("action adapter", () => {
     expect(getExecOutput).not.toHaveBeenCalled();
   });
 
-  it("requires the isolated Dart toolchain before launching SMF", async () => {
+  it("requires the installed SMF CLI before launching a release", async () => {
     process.env.INPUT_PHASE = "pull-request";
-    delete process.env.SMF_DART;
+    delete process.env.SMF_EXECUTABLE;
 
-    await expect(run()).rejects.toThrow("Dart toolchain is missing");
+    await expect(run()).rejects.toThrow(
+      "installed smf CLI executable is missing",
+    );
     expect(getExecOutput).not.toHaveBeenCalled();
   });
 

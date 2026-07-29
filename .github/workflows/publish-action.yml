@@ -51,7 +51,7 @@ jobs:
             exit 1
           fi
 
-          for path in action.yml dist/index.js vendor/smf/SMF_COMMIT; do
+          for path in action.yml dist/index.js SMF_CLI_VERSION; do
             if [[ ! -f "$path" ]]; then
               echo "Published release is missing $path." >&2
               exit 1
