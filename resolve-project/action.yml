@@ -40,6 +40,23 @@ runs:
           echo "smf-path must point directly to an smf directory." >&2
           exit 1
         fi
+        if [[ -z "$GITHUB_WORKSPACE" || "$GITHUB_WORKSPACE" == *$'\n'* || "$GITHUB_WORKSPACE" == *$'\r'* || ! -d "$GITHUB_WORKSPACE" ]]; then
+          echo "The GitHub workspace is missing or invalid." >&2
+          exit 1
+        fi
+        if [[ ! -d "$INPUT_SMF_PATH" ]]; then
+          echo "$INPUT_SMF_PATH does not exist." >&2
+          exit 1
+        fi
+        workspace_real_path="$(cd "$GITHUB_WORKSPACE" && pwd -P)"
+        smf_real_path="$(cd "$INPUT_SMF_PATH" && pwd -P)"
+        case "$smf_real_path" in
+          "$workspace_real_path"/*) ;;
+          *)
+            echo "smf-path must resolve inside the repository." >&2
+            exit 1
+            ;;
+        esac
         if [[ ! -f "$INPUT_SMF_PATH/config.yaml" ]]; then
           echo "$INPUT_SMF_PATH/config.yaml does not exist." >&2
           exit 1

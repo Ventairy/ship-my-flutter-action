@@ -52,24 +52,30 @@ inputs:
     required: false
 
 outputs:
-  phase:
-    description: For pull-request, the selected next phase; otherwise, the completed phase.
-    value: ${{ steps.run.outputs.phase }}
-  platform:
-    description: Selected platform; omitted when a pull request contains both platforms.
-    value: ${{ steps.run.outputs.platform }}
-  releases:
-    description: JSON matrix of platform and version objects selected by pull-request.
-    value: ${{ steps.run.outputs.releases }}
-  version:
-    description: Selected platform version; omitted when a pull request contains both platforms.
-    value: ${{ steps.run.outputs.version }}
-  branch:
-    description: Release PR branch for a candidate checkout.
-    value: ${{ steps.run.outputs.branch }}
+  next-phase:
+    description: Phase selected by pull-request (noop, release-candidate, or ship).
+    value: ${{ steps.run.outputs.next-phase }}
+  targets:
+    description: JSON matrix of platform and version targets selected by pull-request.
+    value: ${{ steps.run.outputs.targets }}
+  release-branch:
+    description: Release PR branch selected by pull-request for a candidate checkout.
+    value: ${{ steps.run.outputs.release-branch }}
   pull-request-number:
-    description: Release pull request number.
+    description: Release pull request number selected by pull-request.
     value: ${{ steps.run.outputs.pull-request-number }}
+  candidates:
+    description: JSON list of release-candidate receipts produced by release-candidate.
+    value: ${{ steps.run.outputs.candidates }}
+  releases:
+    description: JSON list of platform release evidence produced by ship.
+    value: ${{ steps.run.outputs.releases }}
+  platform:
+    description: Platform convenience output when exactly one target, candidate, or release exists.
+    value: ${{ steps.run.outputs.platform }}
+  version:
+    description: Version convenience output when exactly one target, candidate, or release exists.
+    value: ${{ steps.run.outputs.version }}
   artifact-id:
     description: Store artifact identifier (Apple build ID or Google Play versionCode).
     value: ${{ steps.run.outputs.artifact-id }}

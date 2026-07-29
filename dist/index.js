@@ -31225,38 +31225,44 @@ var external_node_url_ = __nccwpck_require__(3136);
 
 
 
-const Phase = {
-    pullRequest: "pull-request",
-    releaseCandidate: "release-candidate",
-    ship: "ship",
-};
+var ReleasePhase;
+(function (ReleasePhase) {
+    ReleasePhase["pullRequest"] = "pull-request";
+    ReleasePhase["releaseCandidate"] = "release-candidate";
+    ReleasePhase["ship"] = "ship";
+})(ReleasePhase || (ReleasePhase = {}));
 const Platform = {
     ios: "ios",
     android: "android",
 };
-const PullRequestResultPhase = {
-    noop: "noop",
-    releaseCandidate: Phase.releaseCandidate,
-    ship: Phase.ship,
-};
+var PullRequestResultPhase;
+(function (PullRequestResultPhase) {
+    PullRequestResultPhase["noop"] = "noop";
+    PullRequestResultPhase["releaseCandidate"] = "release-candidate";
+    PullRequestResultPhase["ship"] = "ship";
+})(PullRequestResultPhase || (PullRequestResultPhase = {}));
 const ResultField = {
-    phase: "phase",
-    releases: "releases",
+    nextPhase: "nextPhase",
+    targets: "targets",
+    releaseBranch: "releaseBranch",
+    pullRequestNumber: "pullRequestNumber",
+    releaseCandidateReceipts: "releaseCandidateReceipts",
+    shippedReleases: "shippedReleases",
     platform: "platform",
     version: "version",
-    branch: "branch",
-    pullRequestNumber: "pullRequestNumber",
     artifactId: "artifactId",
     buildNumber: "buildNumber",
     githubReleaseUrl: "githubReleaseUrl",
 };
 const OutputName = {
-    phase: "phase",
+    nextPhase: "next-phase",
+    targets: "targets",
+    releaseBranch: "release-branch",
+    pullRequestNumber: "pull-request-number",
+    candidates: "candidates",
     releases: "releases",
     platform: "platform",
     version: "version",
-    branch: "branch",
-    pullRequestNumber: "pull-request-number",
     artifactId: "artifact-id",
     buildNumber: "build-number",
     releaseUrl: "release-url",
@@ -31284,9 +31290,9 @@ function maskSensitiveInputs() {
 }
 function phase() {
     const value = process.env.INPUT_PHASE?.trim();
-    if (value === Phase.pullRequest ||
-        value === Phase.releaseCandidate ||
-        value === Phase.ship) {
+    if (value === ReleasePhase.pullRequest ||
+        value === ReleasePhase.releaseCandidate ||
+        value === ReleasePhase.ship) {
         return value;
     }
     throw new Error(`Unsupported phase "${value ?? ""}".`);
@@ -31380,42 +31386,43 @@ function main_platform(result, context) {
     return value;
 }
 function pullRequestResultPhase(result) {
-    const value = result[ResultField.phase];
+    const value = result[ResultField.nextPhase];
     if (value === PullRequestResultPhase.noop ||
         value === PullRequestResultPhase.releaseCandidate ||
         value === PullRequestResultPhase.ship) {
         return value;
     }
-    throw new Error('smf returned an invalid pull-request result: "phase" must be ' +
+    throw new Error('smf returned an invalid pull-request result: "nextPhase" must be ' +
         '"noop", "release-candidate", or "ship".');
 }
 function mapPullRequestOutputs(result) {
     const nextPhase = pullRequestResultPhase(result);
     if (nextPhase === PullRequestResultPhase.noop) {
-        setOutput(OutputName.phase, nextPhase);
+        setOutput(OutputName.nextPhase, nextPhase);
         return;
     }
-    const releases = releaseMatrix(result);
-    let branch;
+    const targets = releaseTargetMatrix(result);
+    let releaseBranch;
     let pullRequestNumber;
     if (nextPhase === PullRequestResultPhase.releaseCandidate) {
-        branch = requiredString(result, ResultField.branch, Phase.pullRequest);
-        pullRequestNumber = optionalPositiveInteger(result, ResultField.pullRequestNumber, Phase.pullRequest);
+        releaseBranch = requiredString(result, ResultField.releaseBranch, ReleasePhase.pullRequest);
+        pullRequestNumber = optionalPositiveInteger(result, ResultField.pullRequestNumber, ReleasePhase.pullRequest);
     }
-    setOutput(OutputName.phase, nextPhase);
-    setOutput(OutputName.releases, JSON.stringify(releases));
-    if (releases.length === 1) {
-        setOutput(OutputName.platform, releases[0].platform);
-        setOutput(OutputName.version, releases[0].version);
+    setOutput(OutputName.nextPhase, nextPhase);
+    setOutput(OutputName.targets, JSON.stringify(targets));
+    if (targets.length === 1) {
+        setOutput(OutputName.platform, targets[0].platform);
+        setOutput(OutputName.version, targets[0].version);
     }
-    if (branch !== undefined)
-        setOutput(OutputName.branch, branch);
+    if (releaseBranch !== undefined) {
+        setOutput(OutputName.releaseBranch, releaseBranch);
+    }
     if (pullRequestNumber !== undefined) {
         setOutput(OutputName.pullRequestNumber, String(pullRequestNumber));
     }
 }
-function releaseMatrix(result) {
-    const values = releaseResults(result, "pull-request");
+function releaseTargetMatrix(result) {
+    const values = objectResults(result, ResultField.targets, "pull-request", "target");
     const seen = new Set();
     return values.map((release) => {
         const releasePlatform = main_platform(release, "pull-request release");
@@ -31429,74 +31436,93 @@ function releaseMatrix(result) {
         };
     });
 }
-function releaseResults(result, context) {
-    const values = result[ResultField.releases];
+function objectResults(result, field, context, itemName) {
+    const values = result[field];
     if (!Array.isArray(values) || values.length === 0) {
-        throw new Error(`smf returned an invalid ${context} result: "releases" must be a ` +
+        throw new Error(`smf returned an invalid ${context} result: "${field}" must be a ` +
             "non-empty list.");
     }
     return values.map((value) => {
         if (value === null || Array.isArray(value) || typeof value !== "object") {
-            throw new Error(`smf returned an invalid ${context} result: each release must be ` +
+            throw new Error(`smf returned an invalid ${context} result: each ${itemName} must be ` +
                 "an object.");
         }
         return value;
     });
 }
-function mapReleaseCandidateOutputs(result) {
-    if (result[ResultField.phase] !== Phase.releaseCandidate) {
-        throw new Error('smf returned an invalid release-candidate result: "phase" must be ' +
-            '"release-candidate".');
+function platformReleaseResults(result, context) {
+    const isReleaseCandidate = context === ReleasePhase.releaseCandidate;
+    const values = objectResults(result, isReleaseCandidate
+        ? ResultField.releaseCandidateReceipts
+        : ResultField.shippedReleases, context, isReleaseCandidate ? "release candidate receipt" : "shipped release");
+    const seen = new Set();
+    return values.map((value) => {
+        const releasePlatform = main_platform(value, context);
+        if (seen.has(releasePlatform)) {
+            throw new Error(`smf returned duplicate ${releasePlatform} ${context} results.`);
+        }
+        seen.add(releasePlatform);
+        const release = {
+            result: value,
+            platform: releasePlatform,
+            version: requiredString(value, ResultField.version, context),
+            artifactId: requiredString(value, ResultField.artifactId, context),
+            buildNumber: requiredString(value, ResultField.buildNumber, context),
+        };
+        if (isReleaseCandidate)
+            return release;
+        return {
+            ...release,
+            githubReleaseUrl: requiredString(value, ResultField.githubReleaseUrl, context),
+        };
+    });
+}
+function verifySelectedPlatformResult(results, selectedPlatform, context) {
+    if (selectedPlatform === undefined)
+        return;
+    if (results.length !== 1 || results[0].platform !== selectedPlatform) {
+        throw new Error(`smf returned an invalid ${context} result: expected exactly one ` +
+            `${selectedPlatform} result.`);
     }
-    const releases = releaseResults(result, Phase.releaseCandidate);
-    setOutput(OutputName.phase, Phase.releaseCandidate);
-    setOutput(OutputName.releases, JSON.stringify(releases));
+}
+function mapReleaseCandidateOutputs(result, selectedPlatform) {
+    const candidates = platformReleaseResults(result, ReleasePhase.releaseCandidate);
+    verifySelectedPlatformResult(candidates, selectedPlatform, ReleasePhase.releaseCandidate);
+    setOutput(OutputName.candidates, JSON.stringify(candidates.map((candidate) => candidate.result)));
+    if (candidates.length !== 1)
+        return;
+    const candidate = candidates[0];
+    setOutput(OutputName.platform, candidate.platform);
+    setOutput(OutputName.version, candidate.version);
+    setOutput(OutputName.artifactId, candidate.artifactId);
+    setOutput(OutputName.buildNumber, candidate.buildNumber);
+}
+function mapShipOutputs(result, selectedPlatform) {
+    const releases = platformReleaseResults(result, ReleasePhase.ship);
+    verifySelectedPlatformResult(releases, selectedPlatform, ReleasePhase.ship);
+    setOutput(OutputName.releases, JSON.stringify(releases.map((release) => release.result)));
     if (releases.length !== 1)
         return;
     const release = releases[0];
-    const selected = main_platform(release, Phase.releaseCandidate);
-    const version = requiredString(release, ResultField.version, Phase.releaseCandidate);
-    const artifactId = requiredString(release, ResultField.artifactId, Phase.releaseCandidate);
-    const buildNumber = requiredString(release, ResultField.buildNumber, Phase.releaseCandidate);
-    setOutput(OutputName.platform, selected);
-    setOutput(OutputName.version, version);
-    setOutput(OutputName.artifactId, artifactId);
-    setOutput(OutputName.buildNumber, buildNumber);
+    setOutput(OutputName.platform, release.platform);
+    setOutput(OutputName.version, release.version);
+    setOutput(OutputName.artifactId, release.artifactId);
+    setOutput(OutputName.buildNumber, release.buildNumber);
+    setOutput(OutputName.releaseUrl, release.githubReleaseUrl);
 }
-function mapShipOutputs(result) {
-    if (result[ResultField.phase] !== Phase.ship) {
-        throw new Error('smf returned an invalid ship result: "phase" must be "ship".');
-    }
-    const releases = releaseResults(result, Phase.ship);
-    setOutput(OutputName.phase, Phase.ship);
-    setOutput(OutputName.releases, JSON.stringify(releases));
-    if (releases.length !== 1)
-        return;
-    const release = releases[0];
-    const selected = main_platform(release, Phase.ship);
-    const version = requiredString(release, ResultField.version, Phase.ship);
-    const artifactId = requiredString(release, ResultField.artifactId, Phase.ship);
-    const buildNumber = requiredString(release, ResultField.buildNumber, Phase.ship);
-    const githubReleaseUrl = requiredString(release, ResultField.githubReleaseUrl, Phase.ship);
-    setOutput(OutputName.platform, selected);
-    setOutput(OutputName.version, version);
-    setOutput(OutputName.artifactId, artifactId);
-    setOutput(OutputName.buildNumber, buildNumber);
-    setOutput(OutputName.releaseUrl, githubReleaseUrl);
-}
-function mapOutputs(selected, result) {
+function mapOutputs(selected, result, selectedPlatform) {
     switch (selected) {
-        case Phase.pullRequest:
+        case ReleasePhase.pullRequest:
             mapPullRequestOutputs(result);
             return;
-        case Phase.releaseCandidate:
-            mapReleaseCandidateOutputs(result);
+        case ReleasePhase.releaseCandidate:
+            mapReleaseCandidateOutputs(result, selectedPlatform);
             return;
-        case Phase.ship:
-            mapShipOutputs(result);
+        case ReleasePhase.ship:
+            mapShipOutputs(result, selectedPlatform);
             return;
         default:
-            /* v8 ignore next -- Phase makes this statically unreachable. */
+            /* v8 ignore next -- ReleasePhase makes this statically unreachable. */
             assertNever(selected);
     }
 }
@@ -31509,7 +31535,7 @@ async function run() {
     maskSensitiveInputs();
     const selected = phase();
     const targetPlatform = selectedPlatform();
-    if (selected === Phase.releaseCandidate &&
+    if (selected === ReleasePhase.releaseCandidate &&
         targetPlatform === Platform.ios &&
         process.platform !== "darwin") {
         throw new Error("An iOS release candidate requires a macOS runner.");
@@ -31550,7 +31576,7 @@ async function run() {
         const message = result.stderr.trim() || "The Dart action executable failed.";
         throw new Error(message);
     }
-    mapOutputs(selected, parseResult(result.stdout));
+    mapOutputs(selected, parseResult(result.stdout), targetPlatform);
 }
 /* v8 ignore start -- exercised by GitHub's process-level Action entrypoint. */
 if (process.env.NODE_ENV !== "test") {

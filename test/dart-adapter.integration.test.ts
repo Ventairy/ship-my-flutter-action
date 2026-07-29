@@ -92,7 +92,9 @@ it("runs the vendored Dart planner through the native Action adapter", async () 
     const { run } = await import("../src/main.js");
     await run();
 
-    expect(await fs.readFile(output, "utf8")).toMatch(/^phase<<.+\nnoop\n.+$/m);
+    expect(await fs.readFile(output, "utf8")).toMatch(
+      /^next-phase<<.+\nnoop\n.+$/m,
+    );
   } finally {
     await Promise.all([
       fs.rm(root, { recursive: true, force: true }),

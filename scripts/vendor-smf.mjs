@@ -11,13 +11,7 @@ const actionRoot = path.resolve(
 );
 const workspaceRoot = path.resolve(actionRoot, "..", "smf");
 const destination = path.join(actionRoot, "vendor", "smf");
-const packages = [
-  "smf_hooks",
-  "smf_engine",
-  "smf_apple",
-  "smf_android",
-  "smf_cli",
-];
+const packages = ["smf_hooks", "smf_engine", "smf_cli"];
 
 const [{ stdout: smfCommit }, { stdout: smfStatus }] = await Promise.all([
   execFileAsync("git", ["rev-parse", "HEAD"], { cwd: workspaceRoot }),
@@ -38,9 +32,15 @@ await fs.writeFile(
 publish_to: none
 environment:
   sdk: ">=3.10.0 <4.0.0"
+dev_dependencies:
+  very_good_analysis: 10.1.0
 workspace:
 ${packages.map((name) => `  - packages/${name}`).join("\n")}
 `,
+);
+await fs.copyFile(
+  path.join(workspaceRoot, "analysis_options.yaml"),
+  path.join(destination, "analysis_options.yaml"),
 );
 
 for (const packageName of packages) {

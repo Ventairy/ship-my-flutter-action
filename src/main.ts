@@ -5,12 +5,11 @@ import { fileURLToPath } from "node:url";
 
 type JsonObject = Record<string, unknown>;
 
-const Phase = {
-  pullRequest: "pull-request",
-  releaseCandidate: "release-candidate",
-  ship: "ship",
-} as const;
-type Phase = (typeof Phase)[keyof typeof Phase];
+enum ReleasePhase {
+  pullRequest = "pull-request",
+  releaseCandidate = "release-candidate",
+  ship = "ship",
+}
 
 const Platform = {
   ios: "ios",
@@ -18,21 +17,21 @@ const Platform = {
 } as const;
 type Platform = (typeof Platform)[keyof typeof Platform];
 
-const PullRequestResultPhase = {
-  noop: "noop",
-  releaseCandidate: Phase.releaseCandidate,
-  ship: Phase.ship,
-} as const;
-type PullRequestResultPhase =
-  (typeof PullRequestResultPhase)[keyof typeof PullRequestResultPhase];
+enum PullRequestResultPhase {
+  noop = "noop",
+  releaseCandidate = ReleasePhase.releaseCandidate,
+  ship = ReleasePhase.ship,
+}
 
 const ResultField = {
-  phase: "phase",
-  releases: "releases",
+  nextPhase: "nextPhase",
+  targets: "targets",
+  releaseBranch: "releaseBranch",
+  pullRequestNumber: "pullRequestNumber",
+  releaseCandidateReceipts: "releaseCandidateReceipts",
+  shippedReleases: "shippedReleases",
   platform: "platform",
   version: "version",
-  branch: "branch",
-  pullRequestNumber: "pullRequestNumber",
   artifactId: "artifactId",
   buildNumber: "buildNumber",
   githubReleaseUrl: "githubReleaseUrl",
@@ -40,12 +39,14 @@ const ResultField = {
 type ResultField = (typeof ResultField)[keyof typeof ResultField];
 
 const OutputName = {
-  phase: "phase",
+  nextPhase: "next-phase",
+  targets: "targets",
+  releaseBranch: "release-branch",
+  pullRequestNumber: "pull-request-number",
+  candidates: "candidates",
   releases: "releases",
   platform: "platform",
   version: "version",
-  branch: "branch",
-  pullRequestNumber: "pull-request-number",
   artifactId: "artifact-id",
   buildNumber: "build-number",
   releaseUrl: "release-url",
@@ -74,12 +75,12 @@ function maskSensitiveInputs(): void {
   }
 }
 
-function phase(): Phase {
+function phase(): ReleasePhase {
   const value = process.env.INPUT_PHASE?.trim();
   if (
-    value === Phase.pullRequest ||
-    value === Phase.releaseCandidate ||
-    value === Phase.ship
+    value === ReleasePhase.pullRequest ||
+    value === ReleasePhase.releaseCandidate ||
+    value === ReleasePhase.ship
   ) {
     return value;
   }
@@ -196,7 +197,7 @@ function platform(result: JsonObject, context: string): Platform {
 }
 
 function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
-  const value = result[ResultField.phase];
+  const value = result[ResultField.nextPhase];
   if (
     value === PullRequestResultPhase.noop ||
     value === PullRequestResultPhase.releaseCandidate ||
@@ -205,7 +206,7 @@ function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
     return value;
   }
   throw new Error(
-    'smf returned an invalid pull-request result: "phase" must be ' +
+    'smf returned an invalid pull-request result: "nextPhase" must be ' +
       '"noop", "release-candidate", or "ship".',
   );
 }
@@ -213,38 +214,49 @@ function pullRequestResultPhase(result: JsonObject): PullRequestResultPhase {
 function mapPullRequestOutputs(result: JsonObject): void {
   const nextPhase = pullRequestResultPhase(result);
   if (nextPhase === PullRequestResultPhase.noop) {
-    core.setOutput(OutputName.phase, nextPhase);
+    core.setOutput(OutputName.nextPhase, nextPhase);
     return;
   }
 
-  const releases = releaseMatrix(result);
-  let branch: string | undefined;
+  const targets = releaseTargetMatrix(result);
+  let releaseBranch: string | undefined;
   let pullRequestNumber: number | undefined;
   if (nextPhase === PullRequestResultPhase.releaseCandidate) {
-    branch = requiredString(result, ResultField.branch, Phase.pullRequest);
+    releaseBranch = requiredString(
+      result,
+      ResultField.releaseBranch,
+      ReleasePhase.pullRequest,
+    );
     pullRequestNumber = optionalPositiveInteger(
       result,
       ResultField.pullRequestNumber,
-      Phase.pullRequest,
+      ReleasePhase.pullRequest,
     );
   }
 
-  core.setOutput(OutputName.phase, nextPhase);
-  core.setOutput(OutputName.releases, JSON.stringify(releases));
-  if (releases.length === 1) {
-    core.setOutput(OutputName.platform, releases[0]!.platform);
-    core.setOutput(OutputName.version, releases[0]!.version);
+  core.setOutput(OutputName.nextPhase, nextPhase);
+  core.setOutput(OutputName.targets, JSON.stringify(targets));
+  if (targets.length === 1) {
+    core.setOutput(OutputName.platform, targets[0]!.platform);
+    core.setOutput(OutputName.version, targets[0]!.version);
   }
-  if (branch !== undefined) core.setOutput(OutputName.branch, branch);
+  if (releaseBranch !== undefined) {
+    core.setOutput(OutputName.releaseBranch, releaseBranch);
+  }
   if (pullRequestNumber !== undefined) {
     core.setOutput(OutputName.pullRequestNumber, String(pullRequestNumber));
   }
 }
 
-function releaseMatrix(
+function releaseTargetMatrix(
   result: JsonObject,
 ): Array<{ platform: Platform; version: string }> {
-  const values = releaseResults(result, "pull-request");
+  const values = objectResults(
+    result,
+    ResultField.targets,
+    "pull-request",
+    "target",
+  );
   const seen = new Set<Platform>();
   return values.map((release) => {
     const releasePlatform = platform(release, "pull-request release");
@@ -265,18 +277,23 @@ function releaseMatrix(
   });
 }
 
-function releaseResults(result: JsonObject, context: string): JsonObject[] {
-  const values = result[ResultField.releases];
+function objectResults(
+  result: JsonObject,
+  field: ResultField,
+  context: string,
+  itemName: string,
+): JsonObject[] {
+  const values = result[field];
   if (!Array.isArray(values) || values.length === 0) {
     throw new Error(
-      `smf returned an invalid ${context} result: "releases" must be a ` +
+      `smf returned an invalid ${context} result: "${field}" must be a ` +
         "non-empty list.",
     );
   }
   return values.map((value) => {
     if (value === null || Array.isArray(value) || typeof value !== "object") {
       throw new Error(
-        `smf returned an invalid ${context} result: each release must be ` +
+        `smf returned an invalid ${context} result: each ${itemName} must be ` +
           "an object.",
       );
     }
@@ -284,90 +301,144 @@ function releaseResults(result: JsonObject, context: string): JsonObject[] {
   });
 }
 
-function mapReleaseCandidateOutputs(result: JsonObject): void {
-  if (result[ResultField.phase] !== Phase.releaseCandidate) {
-    throw new Error(
-      'smf returned an invalid release-candidate result: "phase" must be ' +
-        '"release-candidate".',
-    );
-  }
-  const releases = releaseResults(result, Phase.releaseCandidate);
-  core.setOutput(OutputName.phase, Phase.releaseCandidate);
-  core.setOutput(OutputName.releases, JSON.stringify(releases));
-  if (releases.length !== 1) return;
-  const release = releases[0]!;
-  const selected = platform(release, Phase.releaseCandidate);
-  const version = requiredString(
-    release,
-    ResultField.version,
-    Phase.releaseCandidate,
-  );
-  const artifactId = requiredString(
-    release,
-    ResultField.artifactId,
-    Phase.releaseCandidate,
-  );
-  const buildNumber = requiredString(
-    release,
-    ResultField.buildNumber,
-    Phase.releaseCandidate,
-  );
+type PlatformReleaseResult = {
+  result: JsonObject;
+  platform: Platform;
+  version: string;
+  artifactId: string;
+  buildNumber: string;
+};
 
-  core.setOutput(OutputName.platform, selected);
-  core.setOutput(OutputName.version, version);
-  core.setOutput(OutputName.artifactId, artifactId);
-  core.setOutput(OutputName.buildNumber, buildNumber);
+type ShippedReleaseResult = PlatformReleaseResult & {
+  githubReleaseUrl: string;
+};
+
+function platformReleaseResults(
+  result: JsonObject,
+  context: ReleasePhase.releaseCandidate,
+): PlatformReleaseResult[];
+function platformReleaseResults(
+  result: JsonObject,
+  context: ReleasePhase.ship,
+): ShippedReleaseResult[];
+function platformReleaseResults(
+  result: JsonObject,
+  context: ReleasePhase.releaseCandidate | ReleasePhase.ship,
+): Array<PlatformReleaseResult | ShippedReleaseResult> {
+  const isReleaseCandidate = context === ReleasePhase.releaseCandidate;
+  const values = objectResults(
+    result,
+    isReleaseCandidate
+      ? ResultField.releaseCandidateReceipts
+      : ResultField.shippedReleases,
+    context,
+    isReleaseCandidate ? "release candidate receipt" : "shipped release",
+  );
+  const seen = new Set<Platform>();
+  return values.map((value) => {
+    const releasePlatform = platform(value, context);
+    if (seen.has(releasePlatform)) {
+      throw new Error(
+        `smf returned duplicate ${releasePlatform} ${context} results.`,
+      );
+    }
+    seen.add(releasePlatform);
+    const release = {
+      result: value,
+      platform: releasePlatform,
+      version: requiredString(value, ResultField.version, context),
+      artifactId: requiredString(value, ResultField.artifactId, context),
+      buildNumber: requiredString(value, ResultField.buildNumber, context),
+    };
+    if (isReleaseCandidate) return release;
+    return {
+      ...release,
+      githubReleaseUrl: requiredString(
+        value,
+        ResultField.githubReleaseUrl,
+        context,
+      ),
+    };
+  });
 }
 
-function mapShipOutputs(result: JsonObject): void {
-  if (result[ResultField.phase] !== Phase.ship) {
+function verifySelectedPlatformResult(
+  results: PlatformReleaseResult[],
+  selectedPlatform: Platform | undefined,
+  context: ReleasePhase.releaseCandidate | ReleasePhase.ship,
+): void {
+  if (selectedPlatform === undefined) return;
+  if (results.length !== 1 || results[0]!.platform !== selectedPlatform) {
     throw new Error(
-      'smf returned an invalid ship result: "phase" must be "ship".',
+      `smf returned an invalid ${context} result: expected exactly one ` +
+        `${selectedPlatform} result.`,
     );
   }
-  const releases = releaseResults(result, Phase.ship);
-  core.setOutput(OutputName.phase, Phase.ship);
-  core.setOutput(OutputName.releases, JSON.stringify(releases));
-  if (releases.length !== 1) return;
-  const release = releases[0]!;
-  const selected = platform(release, Phase.ship);
-  const version = requiredString(release, ResultField.version, Phase.ship);
-  const artifactId = requiredString(
-    release,
-    ResultField.artifactId,
-    Phase.ship,
-  );
-  const buildNumber = requiredString(
-    release,
-    ResultField.buildNumber,
-    Phase.ship,
-  );
-  const githubReleaseUrl = requiredString(
-    release,
-    ResultField.githubReleaseUrl,
-    Phase.ship,
-  );
-
-  core.setOutput(OutputName.platform, selected);
-  core.setOutput(OutputName.version, version);
-  core.setOutput(OutputName.artifactId, artifactId);
-  core.setOutput(OutputName.buildNumber, buildNumber);
-  core.setOutput(OutputName.releaseUrl, githubReleaseUrl);
 }
 
-function mapOutputs(selected: Phase, result: JsonObject): void {
+function mapReleaseCandidateOutputs(
+  result: JsonObject,
+  selectedPlatform: Platform | undefined,
+): void {
+  const candidates = platformReleaseResults(
+    result,
+    ReleasePhase.releaseCandidate,
+  );
+  verifySelectedPlatformResult(
+    candidates,
+    selectedPlatform,
+    ReleasePhase.releaseCandidate,
+  );
+  core.setOutput(
+    OutputName.candidates,
+    JSON.stringify(candidates.map((candidate) => candidate.result)),
+  );
+  if (candidates.length !== 1) return;
+  const candidate = candidates[0]!;
+
+  core.setOutput(OutputName.platform, candidate.platform);
+  core.setOutput(OutputName.version, candidate.version);
+  core.setOutput(OutputName.artifactId, candidate.artifactId);
+  core.setOutput(OutputName.buildNumber, candidate.buildNumber);
+}
+
+function mapShipOutputs(
+  result: JsonObject,
+  selectedPlatform: Platform | undefined,
+): void {
+  const releases = platformReleaseResults(result, ReleasePhase.ship);
+  verifySelectedPlatformResult(releases, selectedPlatform, ReleasePhase.ship);
+  core.setOutput(
+    OutputName.releases,
+    JSON.stringify(releases.map((release) => release.result)),
+  );
+  if (releases.length !== 1) return;
+  const release = releases[0]!;
+
+  core.setOutput(OutputName.platform, release.platform);
+  core.setOutput(OutputName.version, release.version);
+  core.setOutput(OutputName.artifactId, release.artifactId);
+  core.setOutput(OutputName.buildNumber, release.buildNumber);
+  core.setOutput(OutputName.releaseUrl, release.githubReleaseUrl);
+}
+
+function mapOutputs(
+  selected: ReleasePhase,
+  result: JsonObject,
+  selectedPlatform: Platform | undefined,
+): void {
   switch (selected) {
-    case Phase.pullRequest:
+    case ReleasePhase.pullRequest:
       mapPullRequestOutputs(result);
       return;
-    case Phase.releaseCandidate:
-      mapReleaseCandidateOutputs(result);
+    case ReleasePhase.releaseCandidate:
+      mapReleaseCandidateOutputs(result, selectedPlatform);
       return;
-    case Phase.ship:
-      mapShipOutputs(result);
+    case ReleasePhase.ship:
+      mapShipOutputs(result, selectedPlatform);
       return;
     default:
-      /* v8 ignore next -- Phase makes this statically unreachable. */
+      /* v8 ignore next -- ReleasePhase makes this statically unreachable. */
       assertNever(selected);
   }
 }
@@ -383,7 +454,7 @@ export async function run(): Promise<void> {
   const selected = phase();
   const targetPlatform = selectedPlatform();
   if (
-    selected === Phase.releaseCandidate &&
+    selected === ReleasePhase.releaseCandidate &&
     targetPlatform === Platform.ios &&
     process.platform !== "darwin"
   ) {
@@ -425,7 +496,7 @@ export async function run(): Promise<void> {
       result.stderr.trim() || "The Dart action executable failed.";
     throw new Error(message);
   }
-  mapOutputs(selected, parseResult(result.stdout));
+  mapOutputs(selected, parseResult(result.stdout), targetPlatform);
 }
 
 /* v8 ignore start -- exercised by GitHub's process-level Action entrypoint. */
