@@ -2,6 +2,14 @@
 
 All notable changes to smf-action are documented here.
 
+## [1.2.1](https://github.com/Ventairy/smf-action/compare/v1.2.0...v1.2.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **deps:** pin patched brace-expansion ([#19](https://github.com/Ventairy/smf-action/issues/19)) ([6eab86b](https://github.com/Ventairy/smf-action/commit/6eab86be3c0cfad0ee70f640ed91572f3d255cef))
+* **runtime:** use smf_cli 1.1.0 ([#20](https://github.com/Ventairy/smf-action/issues/20)) ([2cfea8e](https://github.com/Ventairy/smf-action/commit/2cfea8e708b794324b1c2049c197a236606833d9))
+
 ## [1.2.0](https://github.com/Ventairy/smf-action/compare/v1.1.0...v1.2.0) (2026-07-29)
 
 
